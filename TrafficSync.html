@@ -1,0 +1,2710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrafficSync — AI-Powered Adaptive Traffic Management System</title>
+<meta name="description" content="TrafficSync: an AI-powered adaptive traffic management simulator for a four-junction city grid.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* =========================================================
+   TrafficSync — token system
+   bg-void #060A14 · bg-panel #0D1526 · bg-panel-alt #101B30
+   accent-cyan #38E1FF · accent-amber #FFB454 · accent-orange #FF8A3D
+   accent-red #FF4D6A · accent-green #35E28E · accent-violet #A78BFA
+   text-primary #E9EEF9 · text-muted #8895B8 · text-dim #4C5876
+   display: 'Chakra Petch' · body/ui: 'Inter' · data: 'JetBrains Mono'
+   ========================================================= */
+
+:root{
+    --void:#060A14;
+    --panel:#0D1526;
+    --panel-alt:#111C32;
+    --panel-border:rgba(120,170,255,0.14);
+    --panel-border-strong:rgba(120,170,255,0.28);
+
+    --cyan:#38E1FF;
+    --cyan-dim:rgba(56,225,255,0.16);
+    --amber:#FFB454;
+    --orange:#FF8A3D;
+    --red:#FF4D6A;
+    --green:#35E28E;
+    --violet:#A78BFA;
+
+    --text:#E9EEF9;
+    --text-muted:#8895B8;
+    --text-dim:#4C5876;
+
+    --font-display:'Chakra Petch', 'Segoe UI', sans-serif;
+    --font-body:'Inter', 'Segoe UI', sans-serif;
+    --font-mono:'JetBrains Mono', 'Consolas', monospace;
+
+    --radius-s:8px;
+    --radius-m:14px;
+    --radius-l:20px;
+}
+
+*{ box-sizing:border-box; }
+
+html{ color-scheme: dark; }
+
+body{
+    margin:0;
+    min-height:100vh;
+    background:
+        radial-gradient(circle at 12% -10%, rgba(56,225,255,0.10), transparent 42%),
+        radial-gradient(circle at 88% 0%, rgba(167,139,250,0.08), transparent 40%),
+        var(--void);
+    color:var(--text);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+}
+
+.grid-veil{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    background-image:
+        linear-gradient(rgba(120,170,255,0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120,170,255,0.045) 1px, transparent 1px);
+    background-size:42px 42px;
+    -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 85%);
+    mask-image:radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 85%);
+}
+
+button{ font-family:inherit; }
+select{ font-family:inherit; }
+
+/* ---------- header ---------- */
+
+header{
+    position:sticky;
+    top:0;
+    z-index:40;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:16px 28px;
+    background:rgba(6,10,20,0.82);
+    backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--panel-border);
+    flex-wrap:wrap;
+}
+
+.brand{ display:flex; align-items:center; gap:12px; }
+
+.brand-mark{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:42px;
+    height:42px;
+    border-radius:var(--radius-s);
+    background:var(--cyan-dim);
+    color:var(--cyan);
+    box-shadow:0 0 18px rgba(56,225,255,0.25) inset, 0 0 14px rgba(56,225,255,0.18);
+    flex-shrink:0;
+}
+
+header h1{
+    margin:0;
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:0.5px;
+}
+
+header p{
+    margin:1px 0 0;
+    font-size:12px;
+    color:var(--text-muted);
+    letter-spacing:0.3px;
+}
+
+.header-right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+.status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:1.2px;
+    padding:7px 12px;
+    border-radius:999px;
+    border:1px solid var(--panel-border-strong);
+    color:var(--text-muted);
+    background:var(--panel);
+}
+
+.status-dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--text-dim);
+}
+
+.status-pill[data-state="running"]{ color:var(--green); border-color:rgba(53,226,142,0.4); }
+.status-pill[data-state="running"] .status-dot{ background:var(--green); box-shadow:0 0 8px var(--green); animation:pulse-dot 1.4s ease-in-out infinite; }
+.status-pill[data-state="paused"]{ color:var(--amber); border-color:rgba(255,180,84,0.4); }
+.status-pill[data-state="paused"] .status-dot{ background:var(--amber); box-shadow:0 0 8px var(--amber); }
+
+@keyframes pulse-dot{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
+
+/* ---------- buttons ---------- */
+
+.btn{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:13px;
+    color:var(--text);
+    background:var(--panel-alt);
+    border:1px solid var(--panel-border-strong);
+    border-radius:var(--radius-s);
+    padding:9px 14px;
+    cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.btn:hover:not(:disabled){ border-color:var(--cyan); box-shadow:0 0 0 3px var(--cyan-dim); }
+.btn:active:not(:disabled){ transform:translateY(1px); }
+.btn:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+.btn:disabled{ opacity:0.4; cursor:not-allowed; }
+
+.btn-primary{
+    background:linear-gradient(180deg, rgba(56,225,255,0.22), rgba(56,225,255,0.10));
+    border-color:rgba(56,225,255,0.55);
+    color:#EAFDFF;
+}
+.btn-primary:hover:not(:disabled){ box-shadow:0 0 0 3px var(--cyan-dim), 0 0 18px rgba(56,225,255,0.3); }
+
+.btn-ghost{ background:transparent; }
+
+.btn-icon{
+    width:36px; height:36px; padding:0; justify-content:center;
+    border-radius:50%;
+    font-family:var(--font-display);
+    font-weight:700;
+}
+
+/* ---------- layout ---------- */
+
+.container{
+    position:relative;
+    z-index:1;
+    max-width:1360px;
+    margin:0 auto;
+    padding:24px 28px 60px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
+
+.top-controls{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:14px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius-m);
+    padding:16px 18px;
+}
+
+.control{ display:flex; flex-direction:column; gap:6px; min-width:150px; }
+
+.control label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--text-muted);
+    font-weight:600;
+}
+
+.control select{
+    background:var(--panel-alt);
+    color:var(--text);
+    border:1px solid var(--panel-border-strong);
+    border-radius:var(--radius-s);
+    padding:9px 10px;
+    font-size:13px;
+    cursor:pointer;
+}
+.control select:focus-visible{ outline:2px solid var(--cyan); outline-offset:1px; }
+
+.control-actions{ display:flex; gap:10px; margin-left:auto; flex-wrap:wrap; align-self:center; }
+
+/* ---------- stats ---------- */
+
+.stats{
+    display:grid;
+    grid-template-columns:repeat(7, 1fr);
+    gap:14px;
+}
+@media (max-width: 1300px){ .stats{ grid-template-columns:repeat(4, 1fr); } }
+
+.stat-card{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius-m);
+    padding:16px 18px;
+    overflow:hidden;
+}
+
+.stat-card::before{
+    content:"";
+    position:absolute; inset:0 0 auto 0; height:2px;
+    background:linear-gradient(90deg, var(--cyan), transparent 70%);
+    opacity:0.7;
+}
+
+.stat-icon{ font-size:16px; opacity:0.85; }
+
+.stat-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--text-muted);
+    font-weight:600;
+}
+
+.stat-card strong{
+    font-family:var(--font-mono);
+    font-size:26px;
+    font-weight:600;
+    letter-spacing:0.3px;
+    color:var(--text);
+}
+
+/* ---------- main grid ---------- */
+
+.main-grid{
+    display:grid;
+    grid-template-columns:2.15fr 1fr;
+    gap:18px;
+    align-items:start;
+}
+
+section.map-card, section.junction-card, section.comparison-card, section.event-card, section.outcome-card, section.recommend-card{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius-l);
+    padding:18px;
+}
+
+.section-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+}
+
+.section-title h2{
+    margin:0;
+    font-family:var(--font-display);
+    font-size:15px;
+    letter-spacing:0.6px;
+    font-weight:600;
+    color:var(--text);
+}
+
+.section-title h2::before{
+    content:"";
+    display:inline-block;
+    width:6px; height:6px;
+    margin-right:8px;
+    border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 6px var(--cyan);
+    vertical-align:middle;
+}
+
+#clock{
+    font-family:var(--font-mono);
+    font-size:13px;
+    color:var(--cyan);
+    background:var(--cyan-dim);
+    padding:5px 10px;
+    border-radius:999px;
+    letter-spacing:0.5px;
+}
+
+/* ---------- city map ---------- */
+
+.city-map{
+    position:relative;
+    width:100%;
+    aspect-ratio:16/10;
+    background:
+        radial-gradient(circle at 30% 20%, rgba(56,225,255,0.06), transparent 45%),
+        #08101E;
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius-m);
+    overflow:hidden;
+}
+
+.road{
+    position:absolute;
+    background:#131F35;
+    box-shadow:inset 0 0 0 1px rgba(120,170,255,0.08);
+}
+.road.horizontal{ left:0; width:100%; height:34px; }
+.road.horizontal::after{
+    content:"";
+    position:absolute; left:0; right:0; top:50%;
+    height:0; border-top:2px dashed rgba(56,225,255,0.35);
+    transform:translateY(-50%);
+}
+.road.vertical{ top:0; height:100%; width:34px; }
+.road.vertical::after{
+    content:"";
+    position:absolute; top:0; bottom:0; left:50%;
+    width:0; border-left:2px dashed rgba(56,225,255,0.35);
+    transform:translateX(-50%);
+}
+
+.road1{ top:33%; transform:translateY(-50%); }
+.road2{ top:67%; transform:translateY(-50%); }
+.road3{ left:33%; transform:translateX(-50%); }
+.road4{ left:67%; transform:translateX(-50%); }
+
+.junction{
+    position:absolute;
+    width:58px; height:58px;
+    border-radius:12px;
+    background:#0C1830;
+    border:1px solid var(--panel-border-strong);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    z-index:5;
+    box-shadow:0 0 0 6px rgba(6,10,20,0.6);
+}
+.junction b{
+    font-family:var(--font-mono);
+    font-size:10px;
+    color:var(--text-muted);
+    letter-spacing:0.5px;
+}
+
+.j1{ left:33%; top:33%; transform:translate(-50%,-50%); }
+.j2{ left:67%; top:33%; transform:translate(-50%,-50%); }
+.j3{ left:33%; top:67%; transform:translate(-50%,-50%); }
+.j4{ left:67%; top:67%; transform:translate(-50%,-50%); }
+
+.signal{ display:flex; gap:4px; }
+.signal span{
+    width:8px; height:8px;
+    border-radius:50%;
+    background:#1B2740;
+    transition:background .2s ease, box-shadow .2s ease;
+}
+.signal .red.lit{ background:var(--red); box-shadow:0 0 8px var(--red); }
+.signal .yellow.lit{ background:var(--amber); box-shadow:0 0 8px var(--amber); }
+.signal .green.lit{ background:var(--green); box-shadow:0 0 8px var(--green); }
+
+/* ---------- per-approach mini signals (4 per junction) ---------- */
+.approach-signal{
+    position:absolute;
+    display:flex;
+    gap:3px;
+    padding:2px;
+    background:#0A1224;
+    border:1px solid var(--panel-border-strong);
+    border-radius:5px;
+    z-index:6;
+    box-shadow:0 0 0 3px rgba(6,10,20,0.55);
+}
+.approach-signal i{
+    display:block;
+    width:5px; height:5px;
+    border-radius:50%;
+    background:#1B2740;
+    transition:background .2s ease, box-shadow .2s ease;
+}
+.approach-signal i.lit-red{ background:var(--red); box-shadow:0 0 6px var(--red); }
+.approach-signal i.lit-yellow{ background:var(--amber); box-shadow:0 0 6px var(--amber); }
+.approach-signal i.lit-green{ background:var(--green); box-shadow:0 0 6px var(--green); }
+.approach-signal.dir-n{ flex-direction:row; left:50%; top:-19px; transform:translateX(-50%); }
+.approach-signal.dir-s{ flex-direction:row; left:50%; bottom:-19px; transform:translateX(-50%); }
+.approach-signal.dir-e{ flex-direction:column; right:-19px; top:50%; transform:translateY(-50%); }
+.approach-signal.dir-w{ flex-direction:column; left:-19px; top:50%; transform:translateY(-50%); }
+.approach-signal .a-label{ display:none; }
+
+#vehicles{ position:absolute; inset:0; z-index:8; }
+
+.vehicle{
+    position:absolute;
+    width:14px; height:8px;
+    border-radius:3px;
+    background:var(--green);
+    box-shadow:0 0 6px rgba(53,226,142,0.6);
+    transform:translate(-50%,-50%);
+    will-change:left, top, transform;
+}
+.vehicle.state-medium{ background:var(--amber); box-shadow:0 0 6px rgba(255,180,84,0.6); }
+.vehicle.state-high{ background:var(--orange); box-shadow:0 0 6px rgba(255,138,61,0.6); }
+.vehicle.state-severe{ background:var(--red); box-shadow:0 0 6px rgba(255,77,106,0.6); }
+.vehicle.emergency{
+    background:var(--violet);
+    box-shadow:0 0 10px rgba(167,139,250,0.85);
+    width:16px; height:9px;
+    z-index:9;
+    animation:emergency-flash 0.5s steps(2) infinite;
+}
+@keyframes emergency-flash{ 50%{ filter:brightness(1.6); } }
+
+.blocked-road{
+    position:absolute;
+    display:none;
+    align-items:center;
+    gap:6px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.6px;
+    color:#FFE3EA;
+    background:rgba(255,77,106,0.85);
+    padding:6px 10px;
+    border-radius:999px;
+    transform:translate(-50%,-50%);
+    z-index:10;
+    box-shadow:0 0 16px rgba(255,77,106,0.55);
+}
+.blocked-road.visible{ display:inline-flex; }
+.blocked-road[data-kind="accident"]{ background:rgba(255,77,106,0.9); }
+.blocked-road[data-kind="breakdown"]{ background:rgba(255,180,84,0.9); color:#3A2600; }
+.blocked-road[data-kind="flooding"]{ background:rgba(56,225,255,0.9); color:#00303A; }
+.blocked-road[data-kind="police"]{ background:rgba(167,139,250,0.9); }
+.blocked-road[data-kind="roadblock"]{ background:rgba(255,138,61,0.9); }
+
+/* ---------- weather layers ---------- */
+
+.weather-layer{ position:absolute; inset:0; pointer-events:none; z-index:12; opacity:0; transition:opacity .6s ease; }
+
+.rain-layer.active{ opacity:1; }
+.rain-layer{
+    background-image:repeating-linear-gradient(115deg, rgba(180,220,255,0.55) 0px, rgba(180,220,255,0.55) 1px, transparent 1px, transparent 13px);
+    background-size:100% 34px;
+    animation:rain-fall 0.35s linear infinite;
+    mix-blend-mode:screen;
+}
+@keyframes rain-fall{ from{ background-position:0 0; } to{ background-position:-24px 34px; } }
+
+.fog-layer.active{ opacity:1; }
+.fog-layer{
+    background:radial-gradient(circle at 30% 40%, rgba(200,215,235,0.28), transparent 55%),
+               radial-gradient(circle at 75% 65%, rgba(200,215,235,0.22), transparent 60%),
+               rgba(180,195,215,0.14);
+    backdrop-filter:blur(1.5px);
+}
+
+.storm-flash{
+    position:absolute; inset:0; z-index:13; pointer-events:none;
+    background:rgba(210,230,255,0.9); opacity:0;
+}
+.storm-flash.flash{ animation:lightning-flash .45s ease-out; }
+@keyframes lightning-flash{ 0%{ opacity:0.85; } 30%{ opacity:0.1; } 55%{ opacity:0.6; } 100%{ opacity:0; } }
+
+.weather-badge{
+    position:absolute; top:10px; right:10px; z-index:14;
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-mono); font-size:11px; font-weight:600; letter-spacing:0.5px;
+    padding:5px 10px; border-radius:999px;
+    background:rgba(8,14,26,0.75); border:1px solid var(--panel-border-strong);
+    color:var(--text-muted);
+}
+.weather-badge.hidden{ display:none; }
+
+/* ---------- alert banner + buzzer ---------- */
+
+.alert-banner{
+    position:sticky; top:0; z-index:39;
+    max-width:1360px; margin:0 auto; padding:0 28px;
+}
+.alert-banner-inner{
+    display:none;
+    flex-direction:column;
+    gap:6px;
+    margin-top:10px;
+    border-radius:var(--radius-s);
+    border:1px solid rgba(255,77,106,0.55);
+    background:rgba(255,77,106,0.12);
+    backdrop-filter:blur(10px);
+    padding:10px 14px;
+    animation:alert-glow 1.1s ease-in-out infinite;
+}
+.alert-banner-inner.visible{ display:flex; }
+@keyframes alert-glow{
+    0%,100%{ box-shadow:0 0 0 rgba(255,77,106,0); }
+    50%{ box-shadow:0 0 22px rgba(255,77,106,0.35); }
+}
+.alert-row{
+    display:flex; align-items:center; gap:10px; font-size:12.5px; color:#FFDCE3;
+}
+.alert-row .alert-dot{ width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red); flex-shrink:0; animation:pulse-dot 1s ease-in-out infinite; }
+.alert-row time{ font-family:var(--font-mono); font-size:10.5px; color:rgba(255,220,227,0.7); }
+.alert-row .ack-btn{
+    margin-left:auto; flex-shrink:0;
+    font-family:var(--font-mono); font-size:10px; letter-spacing:0.5px;
+    color:#FFDCE3; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.25);
+    border-radius:999px; padding:3px 9px; cursor:pointer;
+}
+.alert-row .ack-btn:hover{ background:rgba(255,255,255,0.18); }
+
+.buzzer-btn.buzzer-on{ color:var(--red); border-color:rgba(255,77,106,0.5); }
+.buzzer-btn.buzzer-on svg{ animation:pulse-dot 1s ease-in-out infinite; }
+
+#greenCorridorBtn.active-corridor{ border-color:var(--green); color:var(--green); box-shadow:0 0 0 3px rgba(53,226,142,0.16); }
+
+/* ---------- manual override + control panel ---------- */
+
+.override-row{
+    display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;
+}
+.override-btn{
+    flex:1;
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.4px;
+    text-align:center;
+    padding:6px 6px;
+    border-radius:7px;
+    border:1px solid var(--panel-border-strong);
+    background:var(--panel);
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:border-color .15s ease, color .15s ease, background .15s ease;
+}
+.override-btn:hover{ border-color:var(--cyan); color:var(--cyan); }
+.override-btn.active{ background:var(--cyan-dim); border-color:var(--cyan); color:var(--cyan); }
+.override-clear{ flex:0 0 auto; padding:6px 10px; }
+
+/* ---------- ERP / dynamic pricing ---------- */
+
+.stat-card.erp strong{ color:var(--amber); }
+.stat-card.erp .stat-sub{ font-size:10px; color:var(--text-dim); margin-top:1px; }
+.stat-card.alerts strong{ color:var(--red); }
+
+/* ---------- control panel select group ---------- */
+
+.control select.incident-select{ min-width:150px; }
+
+.map-empty-state{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    background:rgba(6,10,20,0.55);
+    backdrop-filter:blur(2px);
+    z-index:15;
+    transition:opacity .25s ease;
+}
+.map-empty-state p{
+    margin:0;
+    font-size:13px;
+    color:var(--text-muted);
+    background:var(--panel);
+    border:1px solid var(--panel-border-strong);
+    padding:12px 18px;
+    border-radius:var(--radius-s);
+}
+.map-empty-state strong{ color:var(--text); }
+.map-empty-state.hidden{ opacity:0; pointer-events:none; }
+
+.legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-top:14px;
+    font-size:12px;
+    color:var(--text-muted);
+}
+.legend span{ display:flex; align-items:center; gap:6px; }
+.dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+.green-dot{ background:var(--green); box-shadow:0 0 6px var(--green); }
+.yellow-dot{ background:var(--amber); box-shadow:0 0 6px var(--amber); }
+.orange-dot{ background:var(--orange); box-shadow:0 0 6px var(--orange); }
+.red-dot{ background:var(--red); box-shadow:0 0 6px var(--red); }
+.emergency-dot{ background:var(--violet); box-shadow:0 0 6px var(--violet); }
+
+/* ---------- junction status list ---------- */
+
+#junctionList{ display:flex; flex-direction:column; gap:10px; }
+
+.junction-row{
+    background:var(--panel-alt);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius-s);
+    padding:12px;
+}
+.junction-row-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:8px;
+}
+.junction-row-head b{
+    font-family:var(--font-display);
+    font-size:14px;
+}
+.mode-badge{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.6px;
+    padding:2px 8px;
+    border-radius:999px;
+    background:var(--cyan-dim);
+    color:var(--cyan);
+}
+.junction-directions{ display:flex; gap:8px; }
+.direction-pill{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    padding:7px 9px;
+    border-radius:8px;
+    background:rgba(255,255,255,0.02);
+    border:1px solid var(--panel-border);
+}
+.direction-pill span{ font-size:10px; color:var(--text-muted); letter-spacing:0.4px; }
+.direction-pill strong{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.4px;
+}
+.direction-pill[data-state="green"] strong{ color:var(--green); }
+.direction-pill[data-state="yellow"] strong{ color:var(--amber); }
+.direction-pill[data-state="red"] strong{ color:var(--red); }
+.direction-pill em{ font-style:normal; font-size:10px; color:var(--text-dim); }
+
+.junction-meta{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px 10px;
+    margin-top:9px;
+    padding-top:9px;
+    border-top:1px dashed var(--panel-border);
+}
+.junction-meta div{ font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; gap:6px; }
+.junction-meta div b{ color:var(--text); font-family:var(--font-mono); font-weight:600; font-size:11px; }
+.junction-meta .action-row{ grid-column:1 / -1; }
+.level-badge{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.5px;
+    padding:1px 7px;
+    border-radius:999px;
+}
+.level-badge[data-level="LOW"]{ background:rgba(53,226,142,0.14); color:var(--green); }
+.level-badge[data-level="MEDIUM"]{ background:rgba(255,180,84,0.14); color:var(--amber); }
+.level-badge[data-level="HIGH"]{ background:rgba(255,138,61,0.16); color:var(--orange); }
+.level-badge[data-level="CRITICAL"]{ background:rgba(255,77,106,0.18); color:var(--red); }
+
+/* ---------- prediction / recommendation panels ---------- */
+
+.outcome-card ul, .recommend-card ul{
+    list-style:none;
+    margin:0; padding:0;
+    display:flex; flex-direction:column; gap:8px;
+}
+.outcome-card li, .recommend-card li{
+    font-size:12.5px;
+    line-height:1.5;
+    color:var(--text-muted);
+    padding:8px 10px;
+    background:var(--panel-alt);
+    border:1px solid var(--panel-border);
+    border-left:3px solid var(--cyan);
+    border-radius:8px;
+}
+.recommend-card li{ border-left-color:var(--violet); }
+.recommend-card li.rec-critical, .outcome-card li.outcome-critical{ border-left-color:var(--red); }
+.recommend-card li.rec-high, .outcome-card li.outcome-high{ border-left-color:var(--orange); }
+.outcome-card li b, .recommend-card li b{ color:var(--text); }
+.reduction-row{
+    display:flex;
+    gap:10px;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--panel-border);
+}
+.reduction-chip{
+    flex:1;
+    text-align:center;
+    padding:8px 6px;
+    border-radius:8px;
+    background:rgba(53,226,142,0.08);
+    border:1px solid rgba(53,226,142,0.25);
+}
+.reduction-chip span{ display:block; font-size:9.5px; color:var(--text-muted); letter-spacing:0.4px; text-transform:uppercase; }
+.reduction-chip strong{ font-family:var(--font-mono); font-size:16px; color:var(--green); }
+
+/* ---------- bottom grid ---------- */
+
+.bottom-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+}
+
+.comparison{ display:flex; gap:14px; }
+.comparison-col{
+    flex:1;
+    background:var(--panel-alt);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius-s);
+    padding:14px;
+}
+.comparison-col h3{
+    margin:0 0 10px;
+    font-family:var(--font-display);
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-muted);
+}
+.comparison-col.is-adaptive{ border-color:rgba(56,225,255,0.35); }
+.comparison-col.is-adaptive h3{ color:var(--cyan); }
+.comparison-col p{ margin:8px 0 2px; font-size:11px; color:var(--text-muted); }
+.comparison-col strong{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:17px;
+    color:var(--text);
+}
+.comparison-col.live{ box-shadow:inset 0 0 0 1px rgba(53,226,142,0.4); }
+.comparison-note{ margin:12px 2px 0; font-size:11px; color:var(--text-dim); }
+
+#events{
+    display:flex;
+    flex-direction:column-reverse;
+    gap:8px;
+    max-height:220px;
+    overflow-y:auto;
+    padding-right:4px;
+}
+#events::-webkit-scrollbar{ width:6px; }
+#events::-webkit-scrollbar-thumb{ background:var(--panel-border-strong); border-radius:4px; }
+
+.event-row{
+    display:flex;
+    gap:10px;
+    align-items:baseline;
+    font-size:12.5px;
+    color:var(--text-muted);
+    padding:7px 9px;
+    border-radius:8px;
+    background:rgba(255,255,255,0.02);
+    animation:event-in .25s ease;
+}
+.event-row time{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); flex-shrink:0; }
+.event-row span{ color:var(--text); }
+@keyframes event-in{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+.events-empty{ font-size:12.5px; color:var(--text-dim); text-align:center; padding:20px 0; }
+
+/* ---------- onboarding modal ---------- */
+
+.modal-overlay{
+    position:fixed; inset:0; z-index:100;
+    background:rgba(4,7,14,0.72);
+    backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+}
+.modal-overlay[hidden]{ display:none; }
+.modal{
+    position:relative;
+    max-width:440px;
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--panel-border-strong);
+    border-radius:var(--radius-l);
+    padding:26px 26px 22px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(56,225,255,0.08);
+}
+.modal h2{
+    margin:0 0 6px;
+    font-family:var(--font-display);
+    font-size:20px;
+}
+.modal-intro{ margin:0 0 14px; color:var(--text-muted); font-size:13px; }
+.modal-steps{ margin:0 0 20px; padding-left:18px; display:flex; flex-direction:column; gap:9px; }
+.modal-steps li{ font-size:13px; color:var(--text-muted); line-height:1.45; }
+.modal-steps strong{ color:var(--text); }
+.modal-close{
+    position:absolute; top:14px; right:14px;
+    width:28px; height:28px; border-radius:50%;
+    background:var(--panel-alt); border:1px solid var(--panel-border-strong);
+    color:var(--text-muted); cursor:pointer;
+}
+.modal .btn-primary{ width:100%; justify-content:center; padding:11px; }
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 1100px){
+    .main-grid{ grid-template-columns:1fr; }
+    .bottom-grid{ grid-template-columns:1fr; }
+    .stats{ grid-template-columns:repeat(2, 1fr); }
+}
+
+@media (max-width: 640px){
+    header{ padding:14px 16px; }
+    .container{ padding:18px 14px 40px; }
+    .stats{ grid-template-columns:1fr 1fr; }
+    .control-actions{ margin-left:0; width:100%; }
+    .comparison{ flex-direction:column; }
+}
+
+@media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="grid-veil" aria-hidden="true"></div>
+
+<header>
+    <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none">
+                <path d="M3 12h4M17 12h4M9 6h6M9 18h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="9" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                <circle cx="15" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+            </svg>
+        </span>
+        <div>
+            <h1>TrafficSync</h1>
+            <p>AI-Powered Adaptive Traffic Management System</p>
+        </div>
+    </div>
+
+    <div class="header-right">
+        <span id="simulationStatus" class="status-pill" data-state="stopped">
+            <i class="status-dot" aria-hidden="true"></i>STOPPED
+        </span>
+        <button id="startBtn" class="btn btn-primary" title="Start the live simulation">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            Start
+        </button>
+        <button id="pauseBtn" class="btn" title="Pause the simulation" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+            Pause
+        </button>
+        <button id="resetBtn" class="btn" title="Reset all traffic and stats">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+            Reset
+        </button>
+        <button id="buzzerBtn" class="btn btn-icon buzzer-btn buzzer-on" title="Mute/unmute alert buzzer" aria-label="Toggle alert buzzer">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2z"/></svg>
+        </button>
+        <button id="helpBtn" class="btn btn-icon" title="How this works" aria-label="Open guide">?</button>
+    </div>
+</header>
+
+<div class="alert-banner">
+    <div id="alertBanner" class="alert-banner-inner"></div>
+</div>
+
+<div class="container">
+
+    <div class="top-controls">
+
+        <div class="control">
+            <label for="trafficMode">Traffic mode</label>
+            <select id="trafficMode" title="How many vehicles enter the grid">
+                <option value="normal">Normal</option>
+                <option value="morning">Morning Peak · 9–12</option>
+                <option value="evening">Evening Peak · 4–7</option>
+                <option value="heavy">Heavy Traffic</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label for="signalMode">Signal mode</label>
+            <select id="signalMode" title="How junctions decide when to switch">
+                <option value="adaptive">Adaptive</option>
+                <option value="fixed">Fixed timing</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label for="speed">Simulation speed</label>
+            <select id="speed" title="How fast time moves">
+                <option value="1000">1×</option>
+                <option value="500">2×</option>
+                <option value="250">4×</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label for="weatherMode">Weather</label>
+            <select id="weatherMode" title="Weather conditions affect speed, visibility and incident risk">
+                <option value="clear">Clear</option>
+                <option value="rain">🌧 Rain</option>
+                <option value="fog">🌫 Fog</option>
+                <option value="storm">⛈ Storm</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label for="incidentType">Incident type</label>
+            <select id="incidentType" class="incident-select" title="Type of incident to simulate">
+                <option value="accident">🚑 Accident</option>
+                <option value="breakdown">🔧 Vehicle breakdown</option>
+                <option value="flooding">🌊 Flooding</option>
+                <option value="roadblock">🚧 Road block</option>
+                <option value="police">👮 Police checkpoint</option>
+            </select>
+        </div>
+
+        <div class="control-actions">
+            <button id="incidentBtn" class="btn btn-ghost" title="Trigger the selected incident on a random road">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                Trigger incident
+            </button>
+            <button id="emergencyBtn" class="btn btn-ghost" title="Send an emergency vehicle through with signal priority">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M18 18.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM6 18.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM20 8h-3V6a1 1 0 0 0-1-1h-4v3h-2V5H8a1 1 0 0 0-1 1v2H4a1 1 0 0 0-1 1v5h1.05a2.5 2.5 0 0 1 4.9 0h6.1a2.5 2.5 0 0 1 4.9 0H21V9a1 1 0 0 0-1-1z"/></svg>
+                Add emergency vehicle
+            </button>
+            <button id="greenCorridorBtn" class="btn btn-ghost" title="Singapore-style Green Corridor: force one route all-green for priority traffic">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2 2 7v10l10 5 10-5V7L12 2zm0 2.24L18.8 8 12 11.76 5.2 8 12 4.24zM4 9.62l7 3.85v6.91l-7-3.5V9.62zm9 10.76v-6.91l7-3.85v6.76l-7 3.5z"/></svg>
+                Green corridor
+            </button>
+        </div>
+
+    </div>
+
+    <div class="stats">
+
+        <div class="stat-card">
+            <span class="stat-icon">🚗</span>
+            <span class="stat-label">Total vehicles</span>
+            <strong id="totalVehicles">0</strong>
+        </div>
+
+        <div class="stat-card">
+            <span class="stat-icon">⚡</span>
+            <span class="stat-label">Average speed</span>
+            <strong id="averageSpeed">0 km/h</strong>
+        </div>
+
+        <div class="stat-card">
+            <span class="stat-icon">📡</span>
+            <span class="stat-label">Congestion</span>
+            <strong id="congestion">0%</strong>
+        </div>
+
+        <div class="stat-card">
+            <span class="stat-icon">⏱</span>
+            <span class="stat-label">Waiting time</span>
+            <strong id="waitingTime">0 sec</strong>
+        </div>
+
+        <div class="stat-card">
+            <span class="stat-icon">✅</span>
+            <span class="stat-label">Vehicles cleared</span>
+            <strong id="clearedVehicles">0</strong>
+        </div>
+
+        <div class="stat-card erp">
+            <span class="stat-icon">💳</span>
+            <span class="stat-label">ERP toll rate</span>
+            <strong id="erpToll">$0.00</strong>
+            <span class="stat-sub" id="erpTollSub">Dynamic pricing · light demand</span>
+        </div>
+
+        <div class="stat-card alerts">
+            <span class="stat-icon">🔔</span>
+            <span class="stat-label">Active alerts</span>
+            <strong id="activeAlerts">0</strong>
+        </div>
+
+    </div>
+
+    <div class="main-grid">
+
+        <section class="map-card">
+
+            <div class="section-title">
+                <h2>City traffic network</h2>
+                <span id="clock">09:00 AM</span>
+            </div>
+
+            <div class="city-map" id="cityMap">
+
+                <div class="road horizontal road1"></div>
+                <div class="road horizontal road2"></div>
+                <div class="road vertical road3"></div>
+                <div class="road vertical road4"></div>
+
+                <div class="junction j1" data-id="J1">
+                    <div class="approach-signal dir-n" id="sig-n-J1"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-s" id="sig-s-J1"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-e" id="sig-e-J1"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-w" id="sig-w-J1"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="signal">
+                        <span class="red"></span>
+                        <span class="yellow"></span>
+                        <span class="green"></span>
+                    </div>
+                    <b>J1</b>
+                </div>
+
+                <div class="junction j2" data-id="J2">
+                    <div class="approach-signal dir-n" id="sig-n-J2"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-s" id="sig-s-J2"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-e" id="sig-e-J2"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-w" id="sig-w-J2"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="signal">
+                        <span class="red"></span>
+                        <span class="yellow"></span>
+                        <span class="green"></span>
+                    </div>
+                    <b>J2</b>
+                </div>
+
+                <div class="junction j3" data-id="J3">
+                    <div class="approach-signal dir-n" id="sig-n-J3"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-s" id="sig-s-J3"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-e" id="sig-e-J3"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-w" id="sig-w-J3"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="signal">
+                        <span class="red"></span>
+                        <span class="yellow"></span>
+                        <span class="green"></span>
+                    </div>
+                    <b>J3</b>
+                </div>
+
+                <div class="junction j4" data-id="J4">
+                    <div class="approach-signal dir-n" id="sig-n-J4"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-s" id="sig-s-J4"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-e" id="sig-e-J4"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="approach-signal dir-w" id="sig-w-J4"><i class="red"></i><i class="yellow"></i><i class="green"></i></div>
+                    <div class="signal">
+                        <span class="red"></span>
+                        <span class="yellow"></span>
+                        <span class="green"></span>
+                    </div>
+                    <b>J4</b>
+                </div>
+
+                <div id="vehicles"></div>
+
+                <div id="blockedRoad" class="blocked-road" data-kind="roadblock">
+                    ⚠ ROAD BLOCKED
+                </div>
+
+                <div id="rainLayer" class="weather-layer rain-layer"></div>
+                <div id="fogLayer" class="weather-layer fog-layer"></div>
+                <div id="stormFlash" class="storm-flash"></div>
+                <span id="weatherBadge" class="weather-badge hidden">☀ Clear</span>
+
+                <div id="mapEmptyState" class="map-empty-state">
+                    <p><strong>Grid is idle.</strong> Press Start to bring the city online.</p>
+                </div>
+
+            </div>
+
+            <div class="legend">
+                <span><i class="dot green-dot"></i> Low traffic</span>
+                <span><i class="dot yellow-dot"></i> Medium traffic</span>
+                <span><i class="dot orange-dot"></i> High traffic</span>
+                <span><i class="dot red-dot"></i> Severe traffic</span>
+                <span><i class="dot emergency-dot"></i> Emergency</span>
+            </div>
+
+        </section>
+
+        <section class="junction-card">
+
+            <div class="section-title">
+                <h2>Junction status</h2>
+            </div>
+
+            <div id="junctionList"></div>
+
+        </section>
+
+    </div>
+
+    <div class="bottom-grid">
+
+        <section class="comparison-card">
+
+            <div class="section-title">
+                <h2>Fixed vs adaptive</h2>
+            </div>
+
+            <div class="comparison">
+
+                <div class="comparison-col" id="fixedCol">
+                    <h3>Fixed signal</h3>
+                    <p>Waiting time</p>
+                    <strong id="fixedWaiting">0 sec</strong>
+
+                    <p>Congestion</p>
+                    <strong id="fixedCongestion">0%</strong>
+
+                    <p>Average speed</p>
+                    <strong id="fixedSpeed">0 km/h</strong>
+                </div>
+
+                <div class="comparison-col is-adaptive" id="adaptiveCol">
+                    <h3>Adaptive signal</h3>
+                    <p>Waiting time</p>
+                    <strong id="adaptiveWaiting">0 sec</strong>
+
+                    <p>Congestion</p>
+                    <strong id="adaptiveCongestion">0%</strong>
+
+                    <p>Average speed</p>
+                    <strong id="adaptiveSpeed">0 km/h</strong>
+                </div>
+
+            </div>
+            <p class="comparison-note" id="comparisonNote">Live column reflects the running simulation; the other is modeled for comparison.</p>
+
+            <div class="reduction-row">
+                <div class="reduction-chip">
+                    <span>Congestion cut</span>
+                    <strong id="congestionReduction">0%</strong>
+                </div>
+                <div class="reduction-chip">
+                    <span>Waiting cut</span>
+                    <strong id="waitingReduction">0%</strong>
+                </div>
+                <div class="reduction-chip">
+                    <span>Speed gain</span>
+                    <strong id="speedImprovement">0%</strong>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="event-card">
+
+            <div class="section-title">
+                <h2>System events</h2>
+            </div>
+
+            <div id="events"></div>
+
+        </section>
+
+        <section class="outcome-card">
+
+            <div class="section-title">
+                <h2>Predicted outcome</h2>
+            </div>
+
+            <ul id="outcomeList"><li>Start the simulation to generate live predictions.</li></ul>
+
+        </section>
+
+        <section class="recommend-card">
+
+            <div class="section-title">
+                <h2>Traffic management recommendations</h2>
+            </div>
+
+            <ul id="recommendList"><li>No recommendations yet — awaiting live traffic data.</li></ul>
+
+        </section>
+
+    </div>
+
+</div>
+
+<div id="onboardModal" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+        <button class="modal-close" id="onboardClose" aria-label="Close guide">✕</button>
+        <h2 id="onboardTitle">Welcome to TrafficSync</h2>
+        <p class="modal-intro">A live simulator for a four-junction city grid. Here's how to read it.</p>
+        <ul class="modal-steps">
+            <li><strong>Start / Pause / Reset</strong> — control the simulation clock in the top-right.</li>
+            <li><strong>Traffic mode</strong> — sets how many vehicles enter the grid.</li>
+            <li><strong>Signal mode</strong> — Adaptive junctions extend green for the busier direction; Fixed junctions alternate on a rigid timer.</li>
+            <li><strong>Weather</strong> — Rain, Fog and Storm slow vehicles, cut visibility and raise incident risk, just like real adaptive systems that re-time signals for conditions.</li>
+            <li><strong>Incident type + Trigger incident</strong> — simulate an Accident, Breakdown, Flooding, Road block or Police checkpoint on a random road.</li>
+            <li><strong>Add emergency vehicle</strong> — sends a priority vehicle that forces junctions green ahead of it.</li>
+            <li><strong>Green corridor</strong> — Singapore-style priority routing that forces every junction along one route green in sequence.</li>
+            <li><strong>Manual override</strong> — in Junction status, force any junction's signal green for either direction, overriding the automated logic — this is how a human operator or GLIDE-style traffic control room intervenes.</li>
+            <li><strong>Alert buzzer</strong> — incidents and auto-detected hazards raise a flashing alert banner with an audible buzzer; mute it from the header.</li>
+            <li><strong>ERP toll</strong> — a live congestion-based toll estimate, inspired by Singapore's Electronic Road Pricing, rises automatically as the grid gets busier.</li>
+            <li><strong>Fixed vs Adaptive</strong> — compares waiting time, congestion and speed between the two strategies in real time.</li>
+        </ul>
+        <button class="btn btn-primary" id="onboardStart">Got it — let's go</button>
+    </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ============================================================
+   Grid model
+   Road1/Road2 = horizontal (EW) at y=33% / y=67%
+   Road3/Road4 = vertical   (NS) at x=33% / x=67%
+   Junctions sit where a horizontal and vertical road cross.
+   ============================================================ */
+
+const ROADS = {
+    road1: { axis: "h", pos: 33 },
+    road2: { axis: "h", pos: 67 },
+    road3: { axis: "v", pos: 33 },
+    road4: { axis: "v", pos: 67 },
+};
+
+const JUNCTIONS = {
+    J1: { x: 33, y: 33, ewRoad: "road1", nsRoad: "road3" },
+    J2: { x: 67, y: 33, ewRoad: "road1", nsRoad: "road4" },
+    J3: { x: 33, y: 67, ewRoad: "road2", nsRoad: "road3" },
+    J4: { x: 67, y: 67, ewRoad: "road2", nsRoad: "road4" },
+};
+
+const ROAD_JUNCTIONS = {
+    road1: ["J1", "J2"],
+    road2: ["J3", "J4"],
+    road3: ["J1", "J3"],
+    road4: ["J2", "J4"],
+};
+
+const TRAFFIC_MODES = {
+    normal:  { spawnPerSec: 0.55, label: "Normal",       clockStart: null },
+    morning: { spawnPerSec: 1.05, label: "Morning Peak",  clockStart: 9 * 60 },
+    evening: { spawnPerSec: 1.05, label: "Evening Peak",  clockStart: 16 * 60 },
+    heavy:   { spawnPerSec: 1.75, label: "Heavy Traffic", clockStart: null },
+};
+
+const WEATHER_MODES = {
+    clear: { label: "Clear",  icon: "☀", speedMult: 1.00, greenBonus: 0,   incidentChancePerMin: 0.010 },
+    rain:  { label: "Rain",   icon: "🌧", speedMult: 0.82, greenBonus: 0.8, incidentChancePerMin: 0.028 },
+    fog:   { label: "Fog",    icon: "🌫", speedMult: 0.85, greenBonus: 0.5, incidentChancePerMin: 0.022 },
+    storm: { label: "Storm",  icon: "⛈", speedMult: 0.65, greenBonus: 1.4, incidentChancePerMin: 0.045 },
+};
+
+const INCIDENT_TYPES = {
+    accident:  { label: "Accident",           icon: "🚑", durationSec: 22, severity: "high",   slowRadius: 9,  slowMult: 0.45, alertLevel: "critical" },
+    breakdown: { label: "Vehicle breakdown",  icon: "🔧", durationSec: 16, severity: "medium", slowRadius: 6,  slowMult: 0.60, alertLevel: "warning" },
+    flooding:  { label: "Flooding",           icon: "🌊", durationSec: 26, severity: "high",   slowRadius: 10, slowMult: 0.35, alertLevel: "critical" },
+    roadblock: { label: "Road block",         icon: "🚧", durationSec: 13, severity: "medium", slowRadius: 5,  slowMult: 0.50, alertLevel: "warning" },
+    police:    { label: "Police checkpoint",  icon: "👮", durationSec: 18, severity: "low",    slowRadius: 6,  slowMult: 0.55, alertLevel: "info" },
+};
+
+const APPROACH_ZONE = 11;      // % distance before a stop line where cars start queueing
+const STOP_GAP = 2.2;          // % gap kept behind the stop line / car ahead
+const CAR_GAP = 3.2;           // % minimum gap between queued cars
+const MIN_GREEN = 3.0;         // seconds
+const MAX_GREEN = 9.0;         // seconds
+const YELLOW_TIME = 1.4;       // seconds
+const FIXED_GREEN = 5.0;       // seconds
+const BLOCK_DURATION = 13;     // seconds
+const MAX_VEHICLES = 46;
+
+/* ============================================================
+   Peak-hour directional demand profiles
+   Morning: residential -> CBD, heavy inbound on road3/road1.
+   Evening: CBD -> residential, heavy outbound on road4/road2.
+   Weights are relative spawn shares (normalized at use-time);
+   dirBias skews which direction along the road gets more traffic.
+   ============================================================ */
+
+const PEAK_PROFILES = {
+    morning: {
+        label: "Morning Peak",
+        startMin: 9 * 60,
+        peakStartMin: 10 * 60 + 30,
+        peakEndMin: 11 * 60,
+        endMin: 12 * 60,
+        baseSpawn: 0.45,
+        peakSpawn: 1.55,
+        roadWeights: { road1: 0.95, road2: 0.5, road3: 1.35, road4: 0.65 },
+        dirBias:     { road1: 1,    road2: 1,   road3: 1,    road4: 1 }, // +1 favors "into" the grid (dir=1)
+        focusJunctions: ["J1", "J3"],
+        focusRoad: "road3",
+    },
+    evening: {
+        label: "Evening Peak",
+        startMin: 16 * 60,
+        peakStartMin: 17 * 60 + 30,
+        peakEndMin: 18 * 60 + 30,
+        endMin: 19 * 60,
+        baseSpawn: 0.45,
+        peakSpawn: 1.55,
+        roadWeights: { road1: 0.55, road2: 1.25, road3: 0.5, road4: 1.35 },
+        dirBias:     { road1: -1,   road2: -1,   road3: -1,  road4: -1 }, // favors "out of" the grid (dir=-1)
+        focusJunctions: ["J3", "J4"],
+        focusRoad: "road2",
+    },
+};
+
+/* Prediction engine tuning */
+const CONGESTION_LEVELS = { LOW: 35, MEDIUM: 60, HIGH: 80 }; // score < LOW = LOW, etc, >=HIGH threshold value = CRITICAL
+const PREDICTION_WINDOW_MIN = 12; // sim-minutes look-ahead for "what if current trend continues"
+
+/* ============================================================
+   State
+   ============================================================ */
+
+const state = {
+    running: false,
+    lastFrame: null,
+    simMinutes: 9 * 60,           // simulated clock, minutes since midnight
+    spawnAccumulator: 0,
+    vehicleSeq: 0,
+    vehicles: [],                  // live simulation vehicles
+    cleared: 0,
+    waitSamples: [],               // rolling recent completed wait times (sec)
+    junctions: {},                  // per-junction signal state
+    roadBlock: null,                // { road, until (simMinutes), type }
+    emergencyActive: false,
+    modelAdaptive: { waiting: 6, congestion: 18, speed: 42 },
+    modelFixed: { waiting: 6, congestion: 18, speed: 42 },
+
+    weather: "clear",
+    manualOverride: {},             // { J1: { axis: "EW"|"NS", until (simMinutes) } }
+    greenCorridor: null,            // { road, until (simMinutes) }
+    alerts: [],                     // { id, msg, level, time, acknowledged }
+    alertSeq: 0,
+    muted: false,
+    erpToll: 0.5,
+    autoIncidentCooldown: 0,        // sim-minutes until another auto-incident can fire
+
+    diversionActive: false,         // true once a critical junction has triggered a reroute recommendation
+    recommendations: [],            // current list of recommendation strings (rebuilt every frame)
+    outcomes: [],                   // current list of predicted-outcome strings (rebuilt every frame)
+    peakRampWasActive: false,       // for logging peak-window start/end transitions once
+};
+
+for (const id of Object.keys(JUNCTIONS)) {
+    state.junctions[id] = {
+        phase: "EW",              // which axis currently has green
+        transitioning: false,
+        phaseElapsed: 0,
+        signal: { ew: "green", ns: "red" },
+        predicted: { score: 0, level: "LOW" },
+        scoreHistory: [],          // rolling recent predicted scores, for trend detection
+        lastLevel: "LOW",
+        demandDir: "Balanced",
+        recommendedAction: "Monitor",
+    };
+}
+
+/* ============================================================
+   DOM refs
+   ============================================================ */
+
+const $ = (id) => document.getElementById(id);
+
+const els = {
+    status: $("simulationStatus"),
+    startBtn: $("startBtn"),
+    pauseBtn: $("pauseBtn"),
+    resetBtn: $("resetBtn"),
+    helpBtn: $("helpBtn"),
+    trafficMode: $("trafficMode"),
+    signalMode: $("signalMode"),
+    speed: $("speed"),
+    incidentBtn: $("incidentBtn"),
+    emergencyBtn: $("emergencyBtn"),
+    clock: $("clock"),
+    vehiclesLayer: $("vehicles"),
+    blockedRoad: $("blockedRoad"),
+    mapEmpty: $("mapEmptyState"),
+    junctionList: $("junctionList"),
+    events: $("events"),
+    totalVehicles: $("totalVehicles"),
+    averageSpeed: $("averageSpeed"),
+    congestion: $("congestion"),
+    waitingTime: $("waitingTime"),
+    clearedVehicles: $("clearedVehicles"),
+    fixedWaiting: $("fixedWaiting"),
+    fixedCongestion: $("fixedCongestion"),
+    fixedSpeed: $("fixedSpeed"),
+    adaptiveWaiting: $("adaptiveWaiting"),
+    adaptiveCongestion: $("adaptiveCongestion"),
+    adaptiveSpeed: $("adaptiveSpeed"),
+    fixedCol: $("fixedCol"),
+    adaptiveCol: $("adaptiveCol"),
+    comparisonNote: $("comparisonNote"),
+    onboardModal: $("onboardModal"),
+    onboardClose: $("onboardClose"),
+    onboardStart: $("onboardStart"),
+
+    weatherMode: $("weatherMode"),
+    incidentType: $("incidentType"),
+    greenCorridorBtn: $("greenCorridorBtn"),
+    buzzerBtn: $("buzzerBtn"),
+    alertBanner: $("alertBanner"),
+    rainLayer: $("rainLayer"),
+    fogLayer: $("fogLayer"),
+    stormFlash: $("stormFlash"),
+    weatherBadge: $("weatherBadge"),
+    erpToll: $("erpToll"),
+    erpTollSub: $("erpTollSub"),
+    activeAlerts: $("activeAlerts"),
+
+    congestionReduction: $("congestionReduction"),
+    waitingReduction: $("waitingReduction"),
+    speedImprovement: $("speedImprovement"),
+    outcomeList: $("outcomeList"),
+    recommendList: $("recommendList"),
+};
+
+/* ============================================================
+   Utility
+   ============================================================ */
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function rand(lo, hi) { return lo + Math.random() * (hi - lo); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function speedMultiplier() { return 1000 / Number(els.speed.value); }
+
+function formatClock(mins) {
+    let m = Math.floor(mins) % (24 * 60);
+    if (m < 0) m += 24 * 60;
+    let h = Math.floor(m / 60);
+    const mm = String(m % 60).padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12; if (h === 0) h = 12;
+    return `${h}:${mm} ${ampm}`;
+}
+
+function logEvent(msg) {
+    const empty = els.events.querySelector(".events-empty");
+    if (empty) empty.remove();
+    const row = document.createElement("div");
+    row.className = "event-row";
+    const t = document.createElement("time");
+    t.textContent = formatClock(state.simMinutes);
+    const s = document.createElement("span");
+    s.textContent = msg;
+    row.appendChild(t);
+    row.appendChild(s);
+    els.events.appendChild(row);
+    while (els.events.children.length > 30) {
+        els.events.removeChild(els.events.firstElementChild);
+    }
+    els.events.scrollTop = els.events.scrollHeight;
+}
+
+/* ============================================================
+   Alert buzzer
+   ============================================================ */
+
+let audioCtx = null;
+function playBuzzer(level) {
+    if (state.muted) return;
+    try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const freqs = level === "critical" ? [880, 660] : level === "warning" ? [660, 660] : [520];
+        const beeps = level === "critical" ? 3 : level === "warning" ? 2 : 1;
+        for (let i = 0; i < beeps; i++) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "square";
+            osc.frequency.value = freqs[i % freqs.length];
+            const t0 = now + i * 0.22;
+            gain.gain.setValueAtTime(0.0001, t0);
+            gain.gain.exponentialRampToValueAtTime(0.14, t0 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(t0);
+            osc.stop(t0 + 0.18);
+        }
+    } catch (e) { /* audio unavailable — fail silently */ }
+}
+
+function pushAlert(msg, level) {
+    const alert = { id: ++state.alertSeq, msg, level: level || "warning", time: formatClock(state.simMinutes), acknowledged: false };
+    state.alerts.unshift(alert);
+    if (state.alerts.length > 12) state.alerts.pop();
+    playBuzzer(alert.level);
+    renderAlerts();
+    return alert;
+}
+
+function acknowledgeAlert(id) {
+    const a = state.alerts.find((x) => x.id === id);
+    if (a) a.acknowledged = true;
+    renderAlerts();
+}
+
+function renderAlerts() {
+    const active = state.alerts.filter((a) => !a.acknowledged);
+    els.activeAlerts.textContent = active.length;
+    els.alertBanner.classList.toggle("visible", active.length > 0);
+    els.alertBanner.innerHTML = "";
+    for (const a of active.slice(0, 4)) {
+        const row = document.createElement("div");
+        row.className = "alert-row";
+        row.innerHTML = `<i class="alert-dot" aria-hidden="true"></i><time>${a.time}</time><span>${a.msg}</span>`;
+        const btn = document.createElement("button");
+        btn.className = "ack-btn";
+        btn.textContent = "ACKNOWLEDGE";
+        btn.addEventListener("click", () => acknowledgeAlert(a.id));
+        row.appendChild(btn);
+        els.alertBanner.appendChild(row);
+    }
+}
+
+function toggleBuzzer() {
+    state.muted = !state.muted;
+    els.buzzerBtn.classList.toggle("buzzer-on", !state.muted);
+    els.buzzerBtn.title = state.muted ? "Unmute alert buzzer" : "Mute/unmute alert buzzer";
+}
+
+/* ============================================================
+   Weather
+   ============================================================ */
+
+function applyWeatherVisuals() {
+    const w = state.weather;
+    els.rainLayer.classList.toggle("active", w === "rain" || w === "storm");
+    els.fogLayer.classList.toggle("active", w === "fog");
+    const info = WEATHER_MODES[w];
+    if (w === "clear") {
+        els.weatherBadge.classList.add("hidden");
+    } else {
+        els.weatherBadge.classList.remove("hidden");
+        els.weatherBadge.textContent = `${info.icon} ${info.label}`;
+    }
+}
+
+function maybeStormFlash(dt) {
+    if (state.weather !== "storm") return;
+    if (Math.random() < dt * 0.12) {
+        els.stormFlash.classList.remove("flash");
+        void els.stormFlash.offsetWidth; // restart animation
+        els.stormFlash.classList.add("flash");
+    }
+}
+
+/* ============================================================
+   Peak-hour demand engine
+   Computes how much traffic demand exists right now, and how it
+   is distributed across roads/directions, based on the simulated
+   clock. Morning and evening use different profiles so the two
+   peaks never behave the same way.
+   ============================================================ */
+
+function activePeakProfile() {
+    const modeKey = els.trafficMode.value;
+    return PEAK_PROFILES[modeKey] || null;
+}
+
+/* Returns 0..1 — how far into the peak we are (ramps up, holds at peak, ramps back down). */
+function peakRampFactor(profile, simMinutes) {
+    let t = simMinutes % (24 * 60);
+    if (t < profile.startMin - 30 || t > profile.endMin + 30) return 0;
+    if (t < profile.startMin) return 0;
+    if (t < profile.peakStartMin) {
+        return clamp((t - profile.startMin) / Math.max(1, profile.peakStartMin - profile.startMin), 0, 1);
+    }
+    if (t <= profile.peakEndMin) return 1;
+    if (t < profile.endMin) {
+        return clamp(1 - (t - profile.peakEndMin) / Math.max(1, profile.endMin - profile.peakEndMin), 0, 1);
+    }
+    return 0;
+}
+
+/* Current effective vehicles-entering-per-second, and the ramp factor (0 outside peak windows). */
+function calculateTrafficDemand() {
+    const modeKey = els.trafficMode.value;
+    const mode = TRAFFIC_MODES[modeKey];
+    const profile = PEAK_PROFILES[modeKey];
+    if (!profile) return { spawnPerSec: mode.spawnPerSec, ramp: 0, profile: null };
+    const ramp = peakRampFactor(profile, state.simMinutes);
+    const spawnPerSec = profile.baseSpawn + (profile.peakSpawn - profile.baseSpawn) * ramp;
+    return { spawnPerSec, ramp, profile };
+}
+
+/* Weighted road + directional pick for peak profiles — creates directional traffic
+   instead of spawning vehicles uniformly across all four roads. */
+function pickWeightedRoadAndDir(profile, ramp, availableRoads) {
+    const weights = availableRoads.map((r) => Math.max(0.05, profile.roadWeights[r] || 0.5));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    let road = availableRoads[availableRoads.length - 1];
+    for (let i = 0; i < availableRoads.length; i++) {
+        if (r < weights[i]) { road = availableRoads[i]; break; }
+        r -= weights[i];
+    }
+    const bias = (profile.dirBias[road] || 0) * (0.35 + 0.4 * ramp); // bias strengthens as peak intensifies
+    const towardPositive = Math.random() < (0.5 + bias / 2);
+    const dir = towardPositive ? 1 : -1;
+    return { road, dir };
+}
+
+/* Spawns vehicles for this frame, following the live peak-hour demand curve
+   (or the flat rate for Normal/Heavy modes). Logs peak-window transitions. */
+function updatePeakHourTraffic(dt) {
+    const demandInfo = calculateTrafficDemand();
+    const rampActive = demandInfo.ramp > 0.02;
+
+    if (demandInfo.profile) {
+        if (rampActive && !state.peakRampWasActive) {
+            logEvent(`🚦 ${demandInfo.profile.label} started — ${formatClock(state.simMinutes)}.`);
+        } else if (!rampActive && state.peakRampWasActive) {
+            logEvent(`🚦 ${demandInfo.profile.label} window ending — traffic returning to normal.`);
+        }
+    }
+    state.peakRampWasActive = rampActive;
+
+    state.spawnAccumulator += demandInfo.spawnPerSec * dt;
+    while (state.spawnAccumulator >= 1) {
+        spawnVehicle(false);
+        state.spawnAccumulator -= 1;
+    }
+}
+
+/* ============================================================
+   Signals
+   ============================================================ */
+
+function approachQueue(road, junctionId) {
+    const j = JUNCTIONS[junctionId];
+    const stopAt = ROADS[road].axis === "h" ? j.x : j.y;
+    let count = 0;
+    for (const v of state.vehicles) {
+        if (v.road !== road) continue;
+        const d = v.dir === 1 ? stopAt - v.pos : v.pos - stopAt;
+        if (d >= -1 && d <= APPROACH_ZONE) count++;
+    }
+    return count;
+}
+
+function forcedAxisFor(id) {
+    const ov = state.manualOverride[id];
+    if (ov && state.simMinutes < ov.until) return ov.axis;
+    if (ov) delete state.manualOverride[id];
+
+    const gc = state.greenCorridor;
+    if (gc && state.simMinutes < gc.until) {
+        const def = JUNCTIONS[id];
+        if (ROAD_JUNCTIONS[gc.road] && ROAD_JUNCTIONS[gc.road].includes(id)) {
+            return ROADS[gc.road].axis === "h" ? "EW" : "NS";
+        }
+    } else if (gc) {
+        state.greenCorridor = null;
+        els.greenCorridorBtn.classList.remove("active-corridor");
+        logEvent("🟢 Green corridor deactivated");
+    }
+    return null;
+}
+
+/* ============================================================
+   Prediction engine
+   Calculates a live, data-driven congestion score per junction
+   from actual simulation state — no random fake numbers.
+   ============================================================ */
+
+function calculateJunctionDemand(id) {
+    const def = JUNCTIONS[id];
+    const qEW = approachQueue(def.ewRoad, id);
+    const qNS = approachQueue(def.nsRoad, id);
+    let demandDir = "Balanced";
+    if (qEW > qNS + 1) demandDir = "East ↔ West";
+    else if (qNS > qEW + 1) demandDir = "North ↔ South";
+    return { qEW, qNS, demandDir, imbalance: Math.abs(qEW - qNS) };
+}
+
+function predictCongestion(id) {
+    const j = state.junctions[id];
+    const def = JUNCTIONS[id];
+    const demand = calculateJunctionDemand(id);
+    const totalQueue = demand.qEW + demand.qNS;
+
+    // Local vehicle count / density near this junction (both its roads).
+    const nearby = state.vehicles.filter((v) => v.road === def.ewRoad || v.road === def.nsRoad);
+    const density = nearby.length / 14; // 14 ~= a busy local capacity reference
+    const localWaiting = nearby.filter((v) => v.waiting).length;
+    const localCongestionPct = nearby.length ? localWaiting / nearby.length : 0;
+    const avgLocalSpeed = nearby.length ? nearby.reduce((s, v) => s + v.curSpeed, 0) / nearby.length : 8;
+    const speedRatio = clamp(avgLocalSpeed / 8, 0, 1.4);
+    const avgWait = state.waitSamples.length ? state.waitSamples.reduce((s, w) => s + w, 0) / state.waitSamples.length : 0;
+
+    const demandInfo = calculateTrafficDemand();
+    const ramp = demandInfo.ramp;
+    const isFocus = demandInfo.profile && demandInfo.profile.focusJunctions.includes(id);
+
+    const weather = WEATHER_MODES[state.weather];
+    const weatherRisk = (1 - weather.speedMult) * 1.6;
+
+    const incidentOnThisJunction = state.roadBlock && (state.roadBlock.road === def.ewRoad || state.roadBlock.road === def.nsRoad);
+    const incidentRisk = incidentOnThisJunction ? 0.9 : 0;
+
+    const emergencyRisk = state.emergencyActive ? 0.15 : 0;
+
+    // Weighted composite score, 0-100.
+    let score = 0;
+    score += clamp(totalQueue / 10, 0, 1) * 34;      // queue length / queue depth
+    score += clamp(density, 0, 1) * 16;              // traffic density near junction
+    score += localCongestionPct * 18;                // current congestion (waiting share)
+    score += (1 - clamp(speedRatio, 0, 1)) * 10;      // low average speed raises risk
+    score += clamp(avgWait / 25, 0, 1) * 8;           // waiting time
+    score += weatherRisk * 8;                         // weather condition
+    score += incidentRisk * 100 * 0.12;               // road incident nearby
+    score += emergencyRisk * 100 * 0.02;              // emergency vehicle in the grid
+    score += ramp * (isFocus ? 14 : 5);               // peak-hour period + directional demand focus
+    score += clamp(demand.imbalance / 8, 0, 1) * 6;   // directional demand imbalance
+
+    score = clamp(Math.round(score), 0, 100);
+
+    j.scoreHistory.push(score);
+    if (j.scoreHistory.length > 10) j.scoreHistory.shift();
+    const trendSlope = j.scoreHistory.length >= 2
+        ? (j.scoreHistory[j.scoreHistory.length - 1] - j.scoreHistory[0]) / j.scoreHistory.length
+        : 0;
+
+    let level = "LOW";
+    if (score >= CONGESTION_LEVELS.HIGH) level = "CRITICAL";
+    else if (score >= CONGESTION_LEVELS.MEDIUM) level = "HIGH";
+    else if (score >= CONGESTION_LEVELS.LOW) level = "MEDIUM";
+
+    j.predicted = { score, level, trendSlope, totalQueue, demandDir: demand.demandDir };
+    j.demandDir = demand.demandDir;
+    return j.predicted;
+}
+
+/* "If current traffic continues" — extrapolates the trend forward using the
+   junction's own recent score trajectory, not a hard-coded guess. */
+function calculatePredictedOutcome(id) {
+    const j = state.junctions[id];
+    const p = j.predicted;
+    const projected = clamp(Math.round(p.score + p.trendSlope * PREDICTION_WINDOW_MIN), 0, 100);
+    return { projected, minutes: PREDICTION_WINDOW_MIN };
+}
+
+function optimizeSignal(id, adaptive) {
+    const j = state.junctions[id];
+    const p = j.predicted || predictCongestion(id);
+    const demand = calculateJunctionDemand(id);
+
+    // High-demand direction earns extra green time; low-demand direction is trimmed.
+    // Only applied when Adaptive Signal mode is active — Fixed mode keeps its cycle
+    // but the dashboard still shows what adaptive control *would* do.
+    let greenBonus = 0;
+    if (adaptive) {
+        if (p.level === "CRITICAL") greenBonus = 3.2;
+        else if (p.level === "HIGH") greenBonus = 2.0;
+        else if (p.level === "MEDIUM") greenBonus = 0.8;
+
+        const currentAxisQ = j.phase === "EW" ? demand.qEW : demand.qNS;
+        const otherAxisQ = j.phase === "EW" ? demand.qNS : demand.qEW;
+        if (currentAxisQ > otherAxisQ + 2) greenBonus += 1.2; // extend for the actively-green high-demand side
+    }
+
+    let action = "Monitor";
+    if (p.level === "MEDIUM") action = "Prepare adaptive adjustment";
+    else if (p.level === "HIGH") action = `Extend ${demand.demandDir} green`;
+    else if (p.level === "CRITICAL") action = "Prioritize + recommend alternate route";
+    j.recommendedAction = action;
+
+    // Log/alert on level transitions only, so events don't spam every frame.
+    if (p.level !== j.lastLevel) {
+        if (p.level === "MEDIUM") {
+            logEvent(`📈 Traffic demand increasing near ${id}`);
+        } else if (p.level === "HIGH") {
+            logEvent(`⚠ Predicted congestion at ${id} — traffic demand increasing.`);
+            pushAlert(`⚠ Predicted congestion at ${id} — traffic demand increasing.`, "warning");
+        } else if (p.level === "CRITICAL") {
+            logEvent(`🧠 ${id} congestion predicted at ${p.score}%.`);
+            logEvent(`🧠 ${id} ${demand.demandDir} signal optimized — high demand detected.`);
+            pushAlert(`🔀 Alternative route recommended to reduce ${id} traffic.`, "critical");
+            logEvent(`🔀 Alternative route recommended to reduce ${id} traffic.`);
+            state.diversionActive = true;
+        } else if (p.level === "LOW" && j.lastLevel !== "LOW") {
+            logEvent(`✓ Congestion at ${id} stabilizing after adaptive optimization.`);
+        }
+        j.lastLevel = p.level;
+    }
+
+    return { greenBonus };
+}
+
+function updateJunctionSignal(id, dt, adaptive) {
+    const j = state.junctions[id];
+    const def = JUNCTIONS[id];
+    j.phaseElapsed += dt;
+
+    const forcedAxis = forcedAxisFor(id);
+    if (forcedAxis) {
+        if (j.phase !== forcedAxis && !j.transitioning) {
+            j.transitioning = true;
+            j.phaseElapsed = 0;
+            j.signal.ew = j.phase === "EW" ? "yellow" : "red";
+            j.signal.ns = j.phase === "NS" ? "yellow" : "red";
+            return;
+        }
+        if (j.transitioning) {
+            if (j.phaseElapsed >= YELLOW_TIME * 0.6) {
+                j.phase = j.phase === "EW" ? "NS" : "EW";
+                j.transitioning = false;
+                j.phaseElapsed = 0;
+                j.signal.ew = j.phase === "EW" ? "green" : "red";
+                j.signal.ns = j.phase === "NS" ? "green" : "red";
+            }
+            return;
+        }
+        j.signal.ew = forcedAxis === "EW" ? "green" : "red";
+        j.signal.ns = forcedAxis === "NS" ? "green" : "red";
+        return;
+    }
+
+    if (j.transitioning) {
+        if (j.phaseElapsed >= YELLOW_TIME) {
+            j.phase = j.phase === "EW" ? "NS" : "EW";
+            j.transitioning = false;
+            j.phaseElapsed = 0;
+            j.signal.ew = j.phase === "EW" ? "green" : "red";
+            j.signal.ns = j.phase === "NS" ? "green" : "red";
+        }
+        return;
+    }
+
+    let shouldSwitch = false;
+    const wBonus = WEATHER_MODES[state.weather].greenBonus;
+
+    if (adaptive) {
+        // Prediction-driven optimization: high/critical predicted congestion earns
+        // this junction extra green time on its current high-demand phase.
+        predictCongestion(id);
+        const { greenBonus } = optimizeSignal(id, true);
+        const minG = MIN_GREEN + wBonus;
+        const maxG = clamp(MAX_GREEN + wBonus + greenBonus, minG + 0.5, MAX_GREEN + 6);
+
+        const qEW = approachQueue(def.ewRoad, id);
+        const qNS = approachQueue(def.nsRoad, id);
+        const currentQ = j.phase === "EW" ? qEW : qNS;
+        const otherQ = j.phase === "EW" ? qNS : qEW;
+        if (j.phaseElapsed >= maxG) shouldSwitch = true;
+        else if (j.phaseElapsed >= minG && otherQ > currentQ + 1) shouldSwitch = true;
+        else if (j.phaseElapsed >= minG && currentQ === 0 && otherQ > 0) shouldSwitch = true;
+    } else {
+        predictCongestion(id); // predictions keep running even in fixed mode, for the dashboard
+        optimizeSignal(id, false); // logs alerts / recommended action, but doesn't alter fixed timing
+        if (j.phaseElapsed >= FIXED_GREEN + wBonus) shouldSwitch = true;
+    }
+
+    // Emergency preemption: if an emergency vehicle is approaching on the red side, cut short.
+    if (!shouldSwitch && state.emergencyActive && j.phaseElapsed >= 1.2) {
+        for (const v of state.vehicles) {
+            if (!v.emergency) continue;
+            const road = v.road;
+            const wantsEW = road === def.ewRoad;
+            const wantsNS = road === def.nsRoad;
+            if (!wantsEW && !wantsNS) continue;
+            const needsGreenAxis = wantsEW ? "EW" : "NS";
+            if (needsGreenAxis === j.phase) continue; // already green for it
+            const q = approachQueue(road, id);
+            if (q > 0 || approachQueue(road, id) === 0) {
+                const stopAt = ROADS[road].axis === "h" ? def.x : def.y;
+                const d = v.dir === 1 ? stopAt - v.pos : v.pos - stopAt;
+                if (d >= -1 && d <= APPROACH_ZONE * 1.6) {
+                    shouldSwitch = true;
+                    logEvent(`⚡ Priority granted to emergency vehicle at ${id}`);
+                }
+            }
+        }
+    }
+
+    if (shouldSwitch) {
+        j.transitioning = true;
+        j.phaseElapsed = 0;
+        j.signal.ew = j.phase === "EW" ? "yellow" : "red";
+        j.signal.ns = j.phase === "NS" ? "yellow" : "red";
+    }
+}
+
+function junctionAllowsPassage(junctionId, road) {
+    const j = state.junctions[junctionId];
+    const def = JUNCTIONS[junctionId];
+    const axisGreen = road === def.ewRoad ? "ew" : "ns";
+    return j.signal[axisGreen] === "green";
+}
+
+/* ============================================================
+   Vehicles
+   ============================================================ */
+
+function vehicleSpeedState(ratio) {
+    if (ratio > 0.75) return "";
+    if (ratio > 0.5) return "state-medium";
+    if (ratio > 0.25) return "state-high";
+    return "state-severe";
+}
+
+function spawnVehicle(forceEmergency) {
+    if (state.vehicles.length >= MAX_VEHICLES) return;
+    const roadKeys = Object.keys(ROADS).filter((r) => !(state.roadBlock && state.roadBlock.road === r));
+    if (!roadKeys.length) return;
+
+    let road, dir;
+    const demandInfo = calculateTrafficDemand();
+    if (!forceEmergency && demandInfo.profile && demandInfo.ramp > 0) {
+        const picked = pickWeightedRoadAndDir(demandInfo.profile, demandInfo.ramp, roadKeys);
+        road = picked.road; dir = picked.dir;
+    } else {
+        road = pick(roadKeys);
+        dir = pick([1, -1]);
+    }
+    const baseSpeed = forceEmergency ? 13.5 : rand(6.5, 9.5);
+    const v = {
+        id: ++state.vehicleSeq,
+        road, dir,
+        pos: dir === 1 ? 0 : 100,
+        speed: baseSpeed,
+        maxSpeed: baseSpeed,
+        curSpeed: baseSpeed,
+        waiting: false,
+        waitTime: 0,
+        emergency: !!forceEmergency,
+        el: document.createElement("div"),
+    };
+    v.el.className = "vehicle" + (forceEmergency ? " emergency" : "");
+    els.vehiclesLayer.appendChild(v.el);
+    state.vehicles.push(v);
+    if (forceEmergency) state.emergencyActive = true;
+    return v;
+}
+
+function nextJunctionAhead(v) {
+    const ids = ROAD_JUNCTIONS[v.road];
+    const defs = ids.map((id) => JUNCTIONS[id]);
+    const coords = defs.map((d) => (ROADS[v.road].axis === "h" ? d.x : d.y));
+    let best = null, bestDist = Infinity;
+    ids.forEach((id, i) => {
+        const c = coords[i];
+        const d = v.dir === 1 ? c - v.pos : v.pos - c;
+        if (d >= -0.6 && d < bestDist) { bestDist = d; best = { id, coord: c, dist: d }; }
+    });
+    return best;
+}
+
+function carAhead(v) {
+    let closest = null, closestDist = Infinity;
+    for (const other of state.vehicles) {
+        if (other === v || other.road !== v.road || other.dir !== v.dir) continue;
+        const d = v.dir === 1 ? other.pos - v.pos : v.pos - other.pos;
+        if (d > 0 && d < closestDist) { closestDist = d; closest = other; }
+    }
+    return closestDist;
+}
+
+function updateVehicle(v, dt) {
+    // Road-block virtual stop line at midpoint of the blocked road.
+    let blockedStop = null;
+    if (state.roadBlock && state.roadBlock.road === v.road) {
+        const d = v.dir === 1 ? 50 - v.pos : v.pos - 50;
+        if (d >= -1) blockedStop = { dist: d };
+    }
+
+    const junctionAhead = nextJunctionAhead(v);
+    const gapAhead = carAhead(v);
+
+    const weatherMult = WEATHER_MODES[state.weather].speedMult;
+    const baseTargetSpeed = v.maxSpeed * (v.emergency ? Math.max(weatherMult, 0.8) : weatherMult);
+    let targetSpeed = baseTargetSpeed;
+    let mustStopDist = Infinity;
+    let incidentCap = Infinity;
+
+    // Rubbernecking / caution slowdown near an active incident, even before the physical stop line.
+    if (state.roadBlock && state.roadBlock.road === v.road && !v.emergency) {
+        const info = INCIDENT_TYPES[state.roadBlock.type] || INCIDENT_TYPES.roadblock;
+        const distToBlock = v.dir === 1 ? 50 - v.pos : v.pos - 50;
+        if (distToBlock > 0 && distToBlock <= info.slowRadius) {
+            incidentCap = v.maxSpeed * info.slowMult;
+        }
+    }
+
+    if (junctionAhead && junctionAhead.dist <= APPROACH_ZONE) {
+        const allowed = v.emergency || junctionAllowsPassage(junctionAhead.id, v.road);
+        if (!allowed) mustStopDist = Math.min(mustStopDist, junctionAhead.dist - STOP_GAP);
+    }
+    if (blockedStop && !v.emergency) {
+        mustStopDist = Math.min(mustStopDist, blockedStop.dist - STOP_GAP);
+    } else if (blockedStop && v.emergency) {
+        mustStopDist = Math.min(mustStopDist, blockedStop.dist - STOP_GAP);
+    }
+    mustStopDist = Math.min(mustStopDist, gapAhead - CAR_GAP);
+
+    if (mustStopDist <= 0.15) {
+        targetSpeed = 0;
+    } else if (mustStopDist < APPROACH_ZONE) {
+        const ratio = clamp(mustStopDist / APPROACH_ZONE, 0.05, 1);
+        targetSpeed = Math.min(baseTargetSpeed, v.maxSpeed * ratio);
+    }
+    targetSpeed = Math.min(targetSpeed, incidentCap);
+
+    v.curSpeed += (targetSpeed - v.curSpeed) * clamp(dt * 4, 0, 1);
+    if (v.curSpeed < 0.15) {
+        v.curSpeed = 0;
+        if (!v.waiting) { v.waiting = true; }
+        v.waitTime += dt;
+    } else {
+        v.waiting = false;
+    }
+
+    v.pos += v.dir * v.curSpeed * dt;
+
+    // Cleared when it exits the far end of the road.
+    if (v.pos >= 100.4 || v.pos <= -0.4) {
+        state.cleared++;
+        if (v.waitTime > 0.05) {
+            state.waitSamples.push(v.waitTime);
+            if (state.waitSamples.length > 40) state.waitSamples.shift();
+        }
+        if (v.emergency) {
+            state.emergencyActive = state.vehicles.some((o) => o !== v && o.emergency);
+            logEvent("🚨 Emergency vehicle cleared the grid");
+        }
+        v.el.remove();
+        return false;
+    }
+    return true;
+}
+
+function renderVehicle(v) {
+    const road = ROADS[v.road];
+    const laneOffset = v.dir === 1 ? -4 : 4;
+    let left, top, rotation;
+    if (road.axis === "h") {
+        left = v.pos; top = road.pos + laneOffset * 0.14;
+        rotation = v.dir === 1 ? 0 : 180;
+    } else {
+        top = v.pos; left = road.pos + laneOffset * 0.14;
+        rotation = v.dir === 1 ? 90 : 270;
+    }
+    v.el.style.left = left + "%";
+    v.el.style.top = top + "%";
+    v.el.style.transform = `translate(-50%,-50%) rotate(${rotation}deg)`;
+    if (!v.emergency) {
+        const ratio = v.maxSpeed > 0 ? v.curSpeed / v.maxSpeed : 1;
+        v.el.className = "vehicle " + vehicleSpeedState(ratio);
+    }
+}
+
+/* ============================================================
+   Comparison model (fixed vs adaptive baseline)
+   ============================================================ */
+
+function baselineFor(mode, incident) {
+    const table = {
+        normal:  { waiting: 5,  congestion: 14, speed: 46 },
+        morning: { waiting: 11, congestion: 38, speed: 30 },
+        evening: { waiting: 11, congestion: 38, speed: 30 },
+        heavy:   { waiting: 17, congestion: 58, speed: 21 },
+    };
+    const b = { ...table[mode] };
+    if (incident) { b.waiting += 6; b.congestion += 14; b.speed -= 6; }
+    return b;
+}
+
+function updateBeforeAfterComparison(dt) {
+    const mode = els.trafficMode.value;
+    const incident = !!state.roadBlock;
+    const base = baselineFor(mode, incident);
+
+    const fixedTarget = { waiting: base.waiting * 1.55, congestion: clamp(base.congestion * 1.4, 0, 96), speed: base.speed * 0.72 };
+    const adaptiveTarget = { waiting: base.waiting * 0.85, congestion: clamp(base.congestion * 0.72, 0, 90), speed: base.speed * 1.08 };
+
+    const lerp = (cur, target) => cur + (target - cur) * clamp(dt * 0.6, 0, 1);
+    state.modelFixed.waiting = lerp(state.modelFixed.waiting, fixedTarget.waiting);
+    state.modelFixed.congestion = lerp(state.modelFixed.congestion, fixedTarget.congestion);
+    state.modelFixed.speed = lerp(state.modelFixed.speed, fixedTarget.speed);
+    state.modelAdaptive.waiting = lerp(state.modelAdaptive.waiting, adaptiveTarget.waiting);
+    state.modelAdaptive.congestion = lerp(state.modelAdaptive.congestion, adaptiveTarget.congestion);
+    state.modelAdaptive.speed = lerp(state.modelAdaptive.speed, adaptiveTarget.speed);
+
+    // Before (fixed) vs after (adaptive) — whichever side is live gets the measured
+    // numbers already merged into the *Vals objects inside updateStats(); here we
+    // just derive the reduction percentages from the two model/live columns.
+    const isAdaptive = els.signalMode.value === "adaptive";
+    const before = isAdaptive ? state.modelFixed : { waiting: state.waitSamples.length ? state.waitSamples.reduce((s, w) => s + w, 0) / state.waitSamples.length : state.modelFixed.waiting, congestion: state.modelFixed.congestion, speed: state.modelFixed.speed };
+    const after = isAdaptive ? { waiting: state.waitSamples.length ? state.waitSamples.reduce((s, w) => s + w, 0) / state.waitSamples.length : state.modelAdaptive.waiting, congestion: state.modelAdaptive.congestion, speed: state.modelAdaptive.speed } : state.modelAdaptive;
+
+    const congestionCut = before.congestion > 0 ? clamp(((before.congestion - after.congestion) / before.congestion) * 100, -20, 100) : 0;
+    const waitingCut = before.waiting > 0 ? clamp(((before.waiting - after.waiting) / before.waiting) * 100, -20, 100) : 0;
+    const speedGain = before.speed > 0 ? clamp(((after.speed - before.speed) / before.speed) * 100, -20, 100) : 0;
+
+    if (els.congestionReduction) els.congestionReduction.textContent = Math.round(congestionCut) + "%";
+    if (els.waitingReduction) els.waitingReduction.textContent = Math.round(waitingCut) + "%";
+    if (els.speedImprovement) els.speedImprovement.textContent = Math.round(speedGain) + "%";
+}
+
+/* ============================================================
+   Stats + rendering
+   ============================================================ */
+
+let junctionListBuilt = false;
+
+function buildJunctionList() {
+    els.junctionList.innerHTML = "";
+    for (const id of Object.keys(JUNCTIONS)) {
+        const row = document.createElement("div");
+        row.className = "junction-row";
+        row.id = "row-" + id;
+        row.innerHTML = `
+            <div class="junction-row-head">
+                <b>${id}</b>
+                <span class="mode-badge" id="mode-${id}">ADAPTIVE</span>
+            </div>
+            <div class="junction-directions">
+                <div class="direction-pill" id="ew-${id}" data-state="green">
+                    <span>East–West</span>
+                    <strong>GREEN</strong>
+                    <em id="ewq-${id}">0 waiting</em>
+                </div>
+                <div class="direction-pill" id="ns-${id}" data-state="red">
+                    <span>North–South</span>
+                    <strong>RED</strong>
+                    <em id="nsq-${id}">0 waiting</em>
+                </div>
+            </div>
+            <div class="override-row">
+                <button class="override-btn" id="ov-ew-${id}" data-id="${id}" data-axis="EW" title="Manually force East–West green at ${id}">Force E–W</button>
+                <button class="override-btn" id="ov-ns-${id}" data-id="${id}" data-axis="NS" title="Manually force North–South green at ${id}">Force N–S</button>
+                <button class="override-btn override-clear" id="ov-clear-${id}" data-id="${id}" title="Return ${id} to automatic control">Auto</button>
+            </div>
+            <div class="junction-meta">
+                <div>Current congestion <b id="cur-${id}">0%</b></div>
+                <div>Predicted <b id="pred-${id}">0%</b></div>
+                <div>Queue <b id="queue-${id}">0 veh</b></div>
+                <div>Demand direction <b id="demand-${id}">—</b></div>
+                <div>Congestion level <span class="level-badge" id="level-${id}" data-level="LOW">LOW</span></div>
+                <div>Trend <b id="trend-${id}">stable</b></div>
+                <div class="action-row">Recommended action <b id="action-${id}">Monitor</b></div>
+            </div>`;
+        els.junctionList.appendChild(row);
+        row.querySelector(`#ov-ew-${id}`).addEventListener("click", () => overrideJunction(id, "EW"));
+        row.querySelector(`#ov-ns-${id}`).addEventListener("click", () => overrideJunction(id, "NS"));
+        row.querySelector(`#ov-clear-${id}`).addEventListener("click", () => clearOverride(id));
+    }
+    junctionListBuilt = true;
+}
+
+function updateJunctionList() {
+    if (!junctionListBuilt) buildJunctionList();
+    const adaptive = els.signalMode.value === "adaptive";
+    for (const id of Object.keys(JUNCTIONS)) {
+        const j = state.junctions[id];
+        const def = JUNCTIONS[id];
+        const ov = state.manualOverride[id];
+        const gc = state.greenCorridor;
+        const onCorridor = gc && ROAD_JUNCTIONS[gc.road] && ROAD_JUNCTIONS[gc.road].includes(id);
+        $("mode-" + id).textContent = ov ? "MANUAL" : onCorridor ? "CORRIDOR" : (adaptive ? "ADAPTIVE" : "FIXED");
+        $("ov-ew-" + id).classList.toggle("active", !!ov && ov.axis === "EW");
+        $("ov-ns-" + id).classList.toggle("active", !!ov && ov.axis === "NS");
+        const ewState = j.signal.ew.toUpperCase();
+        const nsState = j.signal.ns.toUpperCase();
+        const ewPill = $("ew-" + id), nsPill = $("ns-" + id);
+        ewPill.dataset.state = j.signal.ew;
+        nsPill.dataset.state = j.signal.ns;
+        ewPill.querySelector("strong").textContent = ewState;
+        nsPill.querySelector("strong").textContent = nsState;
+        $("ewq-" + id).textContent = approachQueue(def.ewRoad, id) + " waiting";
+        $("nsq-" + id).textContent = approachQueue(def.nsRoad, id) + " waiting";
+
+        const signalEl = document.querySelector(`.junction.j${id.slice(1)} .signal`);
+        if (signalEl) {
+            const overall = j.transitioning ? "yellow" : (j.signal.ew === "green" || j.signal.ns === "green" ? "green" : "red");
+            signalEl.querySelector(".red").classList.toggle("lit", overall === "red");
+            signalEl.querySelector(".yellow").classList.toggle("lit", overall === "yellow");
+            signalEl.querySelector(".green").classList.toggle("lit", overall === "green");
+        }
+
+        // The four per-approach mini signals: N/S follow the vertical (NS) road,
+        // E/W follow the horizontal (EW) road — each is an independently lit signal.
+        setApproachSignal("n-" + id, j.transitioning ? "yellow-ns" : j.signal.ns);
+        setApproachSignal("s-" + id, j.transitioning ? "yellow-ns" : j.signal.ns);
+        setApproachSignal("e-" + id, j.transitioning ? "yellow-ew" : j.signal.ew);
+        setApproachSignal("w-" + id, j.transitioning ? "yellow-ew" : j.signal.ew);
+
+        // Prediction / recommendation metadata
+        const p = j.predicted;
+        const curEl = $("cur-" + id), predEl = $("pred-" + id), qEl = $("queue-" + id);
+        const demandEl = $("demand-" + id), levelEl = $("level-" + id), trendEl = $("trend-" + id), actionEl = $("action-" + id);
+        if (curEl) {
+            const nearby = state.vehicles.filter((v) => v.road === def.ewRoad || v.road === def.nsRoad);
+            const localWaiting = nearby.filter((v) => v.waiting).length;
+            const curPct = nearby.length ? Math.round((localWaiting / nearby.length) * 100) : 0;
+            curEl.textContent = curPct + "%";
+            predEl.textContent = p.score + "%";
+            qEl.textContent = p.totalQueue + " veh";
+            demandEl.textContent = j.demandDir;
+            levelEl.textContent = p.level;
+            levelEl.dataset.level = p.level;
+            trendEl.textContent = p.trendSlope > 1.5 ? "rising" : p.trendSlope < -1.5 ? "falling" : "stable";
+            actionEl.textContent = j.recommendedAction;
+        }
+    }
+}
+
+/* Sets one of the four per-junction approach mini-signals. state can be "green"/"yellow"/"red",
+   or "yellow-ns"/"yellow-ew" during a transition (only the switching axis shows yellow, the
+   other stays red — mirrors the real overall junction signal). */
+function setApproachSignal(key, signalState) {
+    const el = $("sig-" + key);
+    if (!el) return;
+    let lit = "red";
+    if (signalState === "green") lit = "green";
+    else if (signalState === "yellow" || signalState === "yellow-ns" || signalState === "yellow-ew") lit = "yellow";
+    el.querySelector(".red").classList.toggle("lit-red", lit === "red");
+    el.querySelector(".yellow").classList.toggle("lit-yellow", lit === "yellow");
+    el.querySelector(".green").classList.toggle("lit-green", lit === "green");
+}
+
+function updateStats() {
+    const n = state.vehicles.length;
+    els.totalVehicles.textContent = n;
+
+    const moving = state.vehicles.filter((v) => !v.waiting);
+    const avgSpeedRatio = n ? state.vehicles.reduce((s, v) => s + v.curSpeed, 0) / n : 0;
+    const kmh = Math.round(avgSpeedRatio * 6.2);
+    els.averageSpeed.textContent = kmh + " km/h";
+
+    const waitingCount = state.vehicles.filter((v) => v.waiting).length;
+    const congestionPct = n ? Math.round((waitingCount / n) * 100) : 0;
+    els.congestion.textContent = congestionPct + "%";
+
+    const avgWait = state.waitSamples.length
+        ? state.waitSamples.reduce((s, w) => s + w, 0) / state.waitSamples.length
+        : 0;
+    els.waitingTime.textContent = Math.round(avgWait) + " sec";
+
+    els.clearedVehicles.textContent = state.cleared;
+
+    // Comparison card: the active signal mode gets the live measured numbers,
+    // the other mode shows the modeled estimate.
+    const isAdaptive = els.signalMode.value === "adaptive";
+    const liveVals = { waiting: avgWait, congestion: congestionPct, speed: kmh };
+
+    const fixedVals = isAdaptive ? state.modelFixed : liveVals;
+    const adaptiveVals = isAdaptive ? liveVals : state.modelAdaptive;
+
+    els.fixedWaiting.textContent = Math.round(fixedVals.waiting) + " sec";
+    els.fixedCongestion.textContent = Math.round(fixedVals.congestion) + "%";
+    els.fixedSpeed.textContent = Math.round(fixedVals.speed) + " km/h";
+    els.adaptiveWaiting.textContent = Math.round(adaptiveVals.waiting) + " sec";
+    els.adaptiveCongestion.textContent = Math.round(adaptiveVals.congestion) + "%";
+    els.adaptiveSpeed.textContent = Math.round(adaptiveVals.speed) + " km/h";
+
+    els.fixedCol.classList.toggle("live", !isAdaptive);
+    els.adaptiveCol.classList.toggle("live", isAdaptive);
+    els.comparisonNote.textContent = isAdaptive
+        ? "Adaptive column is live from the running grid; Fixed is modeled for comparison."
+        : "Fixed column is live from the running grid; Adaptive is modeled for comparison.";
+
+    updateErpToll(congestionPct);
+}
+
+/* ============================================================
+   Recommendations + predicted outcome panels
+   ============================================================ */
+
+function generateRecommendation() {
+    const list = [];
+    const adaptive = els.signalMode.value === "adaptive";
+    const demandInfo = calculateTrafficDemand();
+
+    const junctionIds = Object.keys(JUNCTIONS);
+    const byScore = junctionIds.slice().sort((a, b) => (state.junctions[b].predicted.score || 0) - (state.junctions[a].predicted.score || 0));
+    const worst = state.junctions[byScore[0]];
+
+    if (demandInfo.profile && demandInfo.ramp > 0.05) {
+        list.push({ text: `Peak demand increasing on ${demandInfo.profile.focusRoad.replace("road", "Road ")} — adaptive control ${adaptive ? "engaged" : "recommended"}.`, level: demandInfo.ramp > 0.6 ? "high" : "" });
+    }
+
+    for (const id of junctionIds) {
+        const j = state.junctions[id];
+        const p = j.predicted;
+        if (p.level === "CRITICAL") {
+            list.push({ text: `Prioritize ${j.demandDir} traffic at <b>${id}</b> — divert from ${JUNCTIONS[id].ewRoad === demandInfo.profile?.focusRoad ? "Road 1" : "affected approach"}.`, level: "critical" });
+        } else if (p.level === "HIGH") {
+            list.push({ text: `Extend green signal at <b>${id}</b> for ${j.demandDir} approach.`, level: "high" });
+        }
+    }
+
+    if (state.roadBlock) {
+        list.push({ text: `Incident on ${state.roadBlock.road.replace("road", "Road ")} detected — rerouting recommended.`, level: "high" });
+    }
+    if (state.emergencyActive) {
+        list.push({ text: `Emergency vehicle detected — priority signal activated at the nearest junction.`, level: "critical" });
+    }
+    if (state.diversionActive && worst && worst.predicted.level !== "CRITICAL") {
+        list.push({ text: `Congestion stabilizing — restoring normal signal timing.`, level: "" });
+        state.diversionActive = false;
+    }
+    if (!adaptive && worst && (worst.predicted.level === "HIGH" || worst.predicted.level === "CRITICAL")) {
+        list.push({ text: `Switch to Adaptive Signal mode to actively respond to rising demand.`, level: "high" });
+    }
+    if (!list.length) {
+        list.push({ text: "Traffic flowing normally — no intervention required.", level: "" });
+    }
+
+    els.recommendList.innerHTML = "";
+    for (const r of list.slice(0, 6)) {
+        const li = document.createElement("li");
+        if (r.level) li.classList.add("rec-" + r.level);
+        li.innerHTML = r.text;
+        els.recommendList.appendChild(li);
+    }
+}
+
+function updateOutcomePanel() {
+    const list = [];
+    const junctionIds = Object.keys(JUNCTIONS);
+    const byScore = junctionIds.slice().sort((a, b) => (state.junctions[b].predicted.score || 0) - (state.junctions[a].predicted.score || 0));
+
+    for (const id of byScore.slice(0, 2)) {
+        const j = state.junctions[id];
+        if (j.predicted.score < 20) continue;
+        const outcome = calculatePredictedOutcome(id);
+        if (outcome.projected > j.predicted.score + 3) {
+            list.push({ text: `If current traffic continues → <b>${id}</b> may reach ${outcome.projected}% congestion in approximately ${outcome.minutes} minutes.`, level: outcome.projected >= CONGESTION_LEVELS.HIGH ? "critical" : outcome.projected >= CONGESTION_LEVELS.MEDIUM ? "high" : "" });
+        } else if (outcome.projected < j.predicted.score - 3) {
+            list.push({ text: `Adaptive signal control is expected to reduce congestion at <b>${id}</b> to around ${outcome.projected}%.`, level: "" });
+        }
+    }
+
+    if (state.roadBlock) {
+        const affected = Object.keys(JUNCTIONS).filter((id) => JUNCTIONS[id].ewRoad === state.roadBlock.road || JUNCTIONS[id].nsRoad === state.roadBlock.road);
+        if (affected.length) {
+            list.push({ text: `${state.roadBlock.road.replace("road", "Road ")} incident may cause traffic spillback toward ${affected.join(" / ")}.`, level: "high" });
+        }
+    }
+
+    const avgWait = state.waitSamples.length ? state.waitSamples.reduce((s, w) => s + w, 0) / state.waitSamples.length : 0;
+    const demandInfo = calculateTrafficDemand();
+    if (demandInfo.profile && demandInfo.ramp > 0.4) {
+        const extraWait = Math.round(demandInfo.ramp * 15);
+        list.push({ text: `Current demand may increase waiting time by approximately ${extraWait} seconds if unmanaged.`, level: "" });
+    }
+
+    if (state.diversionActive) {
+        list.push({ text: `Alternative route recommended to prevent severe congestion.`, level: "critical" });
+    }
+
+    if (!list.length) {
+        list.push({ text: avgWait > 0 ? "Traffic conditions stable — no significant congestion predicted." : "Start the simulation to generate live predictions.", level: "" });
+    }
+
+    els.outcomeList.innerHTML = "";
+    for (const o of list.slice(0, 5)) {
+        const li = document.createElement("li");
+        if (o.level) li.classList.add("outcome-" + o.level);
+        li.innerHTML = o.text;
+        els.outcomeList.appendChild(li);
+    }
+}
+
+/* Singapore-style Electronic Road Pricing: toll scales with live congestion + weather risk. */
+function updateErpToll(congestionPct) {
+    const weatherSurcharge = state.weather === "clear" ? 0 : state.weather === "storm" ? 0.6 : 0.3;
+    const incidentSurcharge = state.roadBlock ? 0.8 : 0;
+    const target = 0.5 + (congestionPct / 100) * 4.5 + weatherSurcharge + incidentSurcharge;
+    state.erpToll += (target - state.erpToll) * 0.05;
+    els.erpToll.textContent = "$" + state.erpToll.toFixed(2);
+    const band = state.erpToll < 1.5 ? "light demand" : state.erpToll < 3 ? "moderate demand" : state.erpToll < 4.5 ? "heavy demand" : "peak demand";
+    els.erpTollSub.textContent = `Dynamic pricing · ${band}`;
+}
+
+/* ============================================================
+   Main loop
+   ============================================================ */
+
+function tick(now) {
+    if (!state.running) return;
+    if (state.lastFrame == null) state.lastFrame = now;
+    let dt = (now - state.lastFrame) / 1000;
+    state.lastFrame = now;
+    dt = clamp(dt, 0, 0.12) * speedMultiplier();
+
+    state.simMinutes += dt * 4; // ~4 sim-minutes per sim-second at 1x
+    els.clock.textContent = formatClock(state.simMinutes);
+
+    maybeStormFlash(dt);
+
+    // road block expiry
+    if (state.roadBlock && state.simMinutes >= state.roadBlock.until) {
+        const info = INCIDENT_TYPES[state.roadBlock.type] || INCIDENT_TYPES.roadblock;
+        logEvent(`✅ ${info.label} on ${state.roadBlock.road.replace("road", "Road ")} cleared`);
+        state.roadBlock = null;
+        els.blockedRoad.classList.remove("visible");
+    }
+
+    // Autonomous incident detection: CCTV/AI-style random hazard, more likely in bad weather.
+    state.autoIncidentCooldown -= dt * 4;
+    if (!state.roadBlock && state.autoIncidentCooldown <= 0) {
+        const chancePerMin = WEATHER_MODES[state.weather].incidentChancePerMin;
+        if (Math.random() < chancePerMin * dt * 4) {
+            const type = state.weather === "rain" || state.weather === "storm"
+                ? pick(["accident", "flooding", "breakdown"])
+                : pick(["accident", "breakdown", "roadblock"]);
+            triggerIncident(type, true);
+            state.autoIncidentCooldown = 8; // sim-minutes before another auto-detection can fire
+        }
+    }
+
+    // spawn — uses the live peak-hour demand curve when a peak mode is selected
+    updatePeakHourTraffic(dt);
+
+    // signals
+    const adaptive = els.signalMode.value === "adaptive";
+    for (const id of Object.keys(JUNCTIONS)) updateJunctionSignal(id, dt, adaptive);
+
+    // vehicles
+    state.vehicles = state.vehicles.filter((v) => updateVehicle(v, dt));
+    for (const v of state.vehicles) renderVehicle(v);
+
+    // comparison model + UI
+    updateBeforeAfterComparison(dt);
+    updateJunctionList();
+    updateStats();
+    generateRecommendation();
+    updateOutcomePanel();
+
+    els.mapEmpty.classList.toggle("hidden", state.vehicles.length > 0 || state.running);
+
+    requestAnimationFrame(tick);
+}
+
+/* ============================================================
+   Controls
+   ============================================================ */
+
+function setStatus(kind) {
+    els.status.dataset.state = kind;
+    els.status.innerHTML = `<i class="status-dot"></i>${kind.toUpperCase()}`;
+}
+
+function start() {
+    if (state.running) return;
+    state.running = true;
+    state.lastFrame = null;
+    els.startBtn.disabled = true;
+    els.pauseBtn.disabled = false;
+    setStatus("running");
+    els.mapEmpty.classList.add("hidden");
+    logEvent("▶ Simulation started");
+    requestAnimationFrame(tick);
+}
+
+function pause() {
+    if (!state.running) return;
+    state.running = false;
+    els.startBtn.disabled = false;
+    els.pauseBtn.disabled = true;
+    setStatus("paused");
+    logEvent("⏸ Simulation paused");
+}
+
+function reset() {
+    state.running = false;
+    state.lastFrame = null;
+    for (const v of state.vehicles) v.el.remove();
+    state.vehicles = [];
+    state.cleared = 0;
+    state.waitSamples = [];
+    state.spawnAccumulator = 0;
+    state.roadBlock = null;
+    state.emergencyActive = false;
+    state.manualOverride = {};
+    state.greenCorridor = null;
+    els.greenCorridorBtn.classList.remove("active-corridor");
+    state.alerts = [];
+    state.erpToll = 0.5;
+    state.autoIncidentCooldown = 0;
+    els.blockedRoad.classList.remove("visible");
+    els.incidentBtn.lastChild.textContent = " Trigger incident";
+    renderAlerts();
+    const mode = TRAFFIC_MODES[els.trafficMode.value];
+    state.simMinutes = mode.clockStart != null ? mode.clockStart : 12 * 60;
+    els.clock.textContent = formatClock(state.simMinutes);
+
+    for (const id of Object.keys(JUNCTIONS)) {
+        state.junctions[id] = {
+            phase: "EW", transitioning: false, phaseElapsed: 0, signal: { ew: "green", ns: "red" },
+            predicted: { score: 0, level: "LOW", trendSlope: 0, totalQueue: 0, demandDir: "Balanced" },
+            scoreHistory: [], lastLevel: "LOW", demandDir: "Balanced", recommendedAction: "Monitor",
+        };
+    }
+    state.modelAdaptive = { waiting: 6, congestion: 18, speed: 42 };
+    state.modelFixed = { waiting: 6, congestion: 18, speed: 42 };
+    state.diversionActive = false;
+    state.peakRampWasActive = false;
+
+    els.startBtn.disabled = false;
+    els.pauseBtn.disabled = true;
+    setStatus("stopped");
+    els.events.innerHTML = '<p class="events-empty">No events yet — start the simulation.</p>';
+    updateJunctionList();
+    updateStats();
+    generateRecommendation();
+    updateOutcomePanel();
+    els.mapEmpty.classList.remove("hidden");
+    logEvent("⟲ Simulation reset");
+}
+
+function overrideJunction(id, axis) {
+    state.manualOverride[id] = { axis, until: state.simMinutes + 30 }; // ~30 sim-min (~7.5 sim-sec at 1x)
+    logEvent(`🎛 Manual override: ${id} forced ${axis === "EW" ? "East–West" : "North–South"} green`);
+    if (!state.running) start();
+}
+
+function clearOverride(id) {
+    if (state.manualOverride[id]) {
+        delete state.manualOverride[id];
+        logEvent(`🎛 ${id} returned to automatic control`);
+    }
+}
+
+function activateGreenCorridor() {
+    if (state.greenCorridor) {
+        logEvent(`🟢 Green corridor on ${state.greenCorridor.road.replace("road", "Road ")} deactivated manually`);
+        state.greenCorridor = null;
+        els.greenCorridorBtn.classList.remove("active-corridor");
+        return;
+    }
+    const road = pick(Object.keys(ROADS));
+    state.greenCorridor = { road, until: state.simMinutes + 20 };
+    els.greenCorridorBtn.classList.add("active-corridor");
+    logEvent(`🟢 Green corridor activated on ${road.replace("road", "Road ")} — priority route, Singapore GLIDE-style`);
+    pushAlert(`🟢 Green corridor active on ${road.replace("road", "Road ")}`, "info");
+    if (!state.running) start();
+}
+
+function triggerIncident(typeOverride, auto) {
+    if (state.roadBlock && !auto) {
+        const info = INCIDENT_TYPES[state.roadBlock.type] || INCIDENT_TYPES.roadblock;
+        logEvent(`✅ ${info.label} on ${state.roadBlock.road.replace("road", "Road ")} cleared manually`);
+        state.roadBlock = null;
+        els.blockedRoad.classList.remove("visible");
+        els.incidentBtn.lastChild.textContent = " Trigger incident";
+        return;
+    }
+    if (state.roadBlock) return; // auto-detection found the grid already has an active incident
+
+    const type = typeOverride || els.incidentType.value;
+    const info = INCIDENT_TYPES[type] || INCIDENT_TYPES.roadblock;
+    const road = pick(Object.keys(ROADS));
+    state.roadBlock = { road, until: state.simMinutes + info.durationSec * 4, type };
+
+    const r = ROADS[road];
+    if (r.axis === "h") {
+        els.blockedRoad.style.left = "50%";
+        els.blockedRoad.style.top = r.pos + "%";
+    } else {
+        els.blockedRoad.style.left = r.pos + "%";
+        els.blockedRoad.style.top = "50%";
+    }
+    els.blockedRoad.dataset.kind = type;
+    els.blockedRoad.textContent = `${info.icon} ${info.label.toUpperCase()}`;
+    els.blockedRoad.classList.add("visible");
+    els.incidentBtn.lastChild.textContent = " Clear road block";
+
+    const roadLabel = road.replace("road", "Road ");
+    const prefix = auto ? "🛰 AI-CCTV detected" : `${info.icon} Simulated`;
+    logEvent(`${prefix} ${info.label.toLowerCase()} on ${roadLabel}`);
+    pushAlert(`${info.icon} ${info.label} on ${roadLabel}${auto ? " — auto-detected" : ""}`, info.alertLevel);
+
+    if (!state.running) start();
+}
+
+function addEmergencyVehicle() {
+    const v = spawnVehicle(true);
+    if (v) {
+        logEvent(`🚨 Emergency vehicle dispatched on ${v.road.replace("road", "Road ")}`);
+        if (!state.running) start();
+    }
+}
+
+/* ============================================================
+   Onboarding
+   ============================================================ */
+
+function openOnboard() { els.onboardModal.hidden = false; }
+function closeOnboard() { els.onboardModal.hidden = true; try { localStorage.setItem("trafficsync_onboarded", "1"); } catch (e) {} }
+
+/* ============================================================
+   Wire up
+   ============================================================ */
+
+els.startBtn.addEventListener("click", start);
+els.pauseBtn.addEventListener("click", pause);
+els.resetBtn.addEventListener("click", reset);
+els.incidentBtn.addEventListener("click", () => triggerIncident());
+els.emergencyBtn.addEventListener("click", addEmergencyVehicle);
+els.greenCorridorBtn.addEventListener("click", activateGreenCorridor);
+els.buzzerBtn.addEventListener("click", toggleBuzzer);
+els.weatherMode.addEventListener("change", () => {
+    state.weather = els.weatherMode.value;
+    applyWeatherVisuals();
+    const info = WEATHER_MODES[state.weather];
+    logEvent(`${info.icon} Weather changed to ${info.label}`);
+});
+els.helpBtn.addEventListener("click", openOnboard);
+els.onboardClose.addEventListener("click", closeOnboard);
+els.onboardStart.addEventListener("click", closeOnboard);
+els.onboardModal.addEventListener("click", (e) => { if (e.target === els.onboardModal) closeOnboard(); });
+
+els.trafficMode.addEventListener("change", () => {
+    const mode = TRAFFIC_MODES[els.trafficMode.value];
+    if (mode.clockStart != null && state.cleared === 0 && state.vehicles.length === 0) {
+        state.simMinutes = mode.clockStart;
+        els.clock.textContent = formatClock(state.simMinutes);
+    }
+    logEvent(`🚦 Traffic mode set to ${mode.label}`);
+});
+els.signalMode.addEventListener("change", () => {
+    logEvent(`🎛 Signal mode set to ${els.signalMode.value === "adaptive" ? "Adaptive" : "Fixed timing"}`);
+});
+els.speed.addEventListener("change", () => {
+    logEvent(`⏩ Simulation speed set to ${els.speed.selectedOptions[0].textContent}`);
+});
+
+/* ============================================================
+   Init
+   ============================================================ */
+
+buildJunctionList();
+reset();
+applyWeatherVisuals();
+renderAlerts();
+els.mapEmpty.classList.remove("hidden");
+
+try {
+    if (!localStorage.getItem("trafficsync_onboarded")) openOnboard();
+} catch (e) { openOnboard(); }
+
+})();
+
+</script>
+
+</body>
+</html>
